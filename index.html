@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Chitti Robot - Debug Live</title>
+    <title>Autonomous Chitti Robot - Full Debug</title>
     <style>
         body {
             background-color: #050505;
@@ -22,16 +22,16 @@
         #robot-face-box {
             width: 100%;
             max-width: 350px;
-            height: 150px;
+            height: 140px;
             background: #000;
             border: 2px solid #00ffcc;
-            border-radius: 15px;
+            border-radius: 12px;
             display: flex;
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
-            padding: 10px;
+            box-shadow: 0 0 15px rgba(0, 255, 204, 0.4);
+            padding: 8px;
             box-sizing: border-box;
             text-align: center;
         }
@@ -39,69 +39,72 @@
         .eye-container {
             display: flex;
             justify-content: space-around;
-            width: 70px;
-            margin-bottom: 8px;
+            width: 60px;
+            margin-bottom: 5px;
         }
         .eye {
-            width: 14px;
-            height: 22px;
+            width: 12px;
+            height: 20px;
             background: #00ffcc;
-            border-radius: 8px;
-            animation: blink 4s infinite;
-        }
-        @keyframes blink {
-            0%, 96%, 100% { transform: scaleY(1); }
-            98% { transform: scaleY(0.1); }
+            border-radius: 6px;
         }
 
         #robot-status {
-            font-size: 12px;
+            font-size: 11px;
             color: #00ffcc;
-            line-height: 1.3;
-            max-height: 55px;
+            line-height: 1.2;
+            max-height: 45px;
             overflow: hidden;
         }
 
-        /* ডিবাগ কনসোল প্যানেল যা স্ক্রিনেই দেখাবে কী হচ্ছে */
+        /* ডিবাগ কনসোল প্যানেল */
         .debug-panel {
             width: 100%;
             max-width: 350px;
             background: #0d1117;
             border: 1px solid #ff0055;
-            padding: 10px;
-            border-radius: 10px;
+            padding: 8px;
+            border-radius: 8px;
             box-sizing: border-box;
-            font-size: 11px;
+            font-size: 10px;
             color: #ff3366;
-            max-height: 130px;
+            height: 110px;
             overflow-y: auto;
             text-align: left;
         }
 
-        .main-panel {
+        /* কন্ট্রোল প্যানেল ও ইনপুট বক্স */
+        .control-panel {
             width: 100%;
             max-width: 350px;
             background: #0d1117;
             border: 1px solid #1f293d;
-            padding: 10px;
-            border-radius: 10px;
+            padding: 8px;
+            border-radius: 8px;
             box-sizing: border-box;
-            font-size: 11px;
-            color: #8b949e;
+            display: flex;
+            gap: 5px;
         }
 
-        #floating-status {
-            position: fixed;
-            bottom: 10px;
-            right: 10px;
+        .control-panel input {
+            flex: 1;
+            background: #000;
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            padding: 6px;
+            border-radius: 4px;
+            font-size: 11px;
+        }
+
+        .control-panel button {
             background: #00ffcc;
             color: #000;
-            padding: 8px 12px;
-            border-radius: 20px;
+            border: none;
+            padding: 6px 10px;
+            border-radius: 4px;
             font-weight: bold;
             font-size: 11px;
-            box-shadow: 0 0 10px rgba(0, 255, 204, 0.6);
-            z-index: 100;
+            cursor: pointer;
         }
     </style>
 </head>
@@ -113,23 +116,21 @@
             <div class="eye"></div>
             <div class="eye"></div>
         </div>
-        <h3 id="ai-name" style="margin: 0 0 3px 0; color: #fff; font-size: 14px;">চিঠি রোবট</h3>
+        <h3 id="ai-name" style="margin: 0 0 2px 0; color: #fff; font-size: 13px;">চিঠি রোবট</h3>
         <p id="robot-status">সিস্টেম লোড হচ্ছে...</p>
     </div>
 
-    <!-- রিয়েল-টাইম ডিবাগ কনসোল (কোথায় কোড প্রবলেম বা কী পড়ছে তা দেখার জন্য) -->
+    <!-- রিয়েল-টাইম ডিবাগ কনসোল -->
     <div class="debug-panel" id="debug-log">
-        <strong>🛡️ ডিবাগ কনসোল (লাইভ মনিটর):</strong><br>
-        > সিস্টেম ইনিশিয়ালাইজড...
+        <strong>🛡️ লাইভ ডিবাগ কনসোল:</strong><br>
+        > সিস্টেম রেডি...
     </div>
 
-    <!-- মেমোরি প্যানেল -->
-    <div class="main-panel">
-        <p style="margin: 2px 0;"><strong>রুলস ও ডাটা:</strong> <span id="rules-list" style="color: #00ffcc;">কিছু নেই</span></p>
+    <!-- টেক্সট কমান্ড ইনপুট প্যানেল (ভয়েস কাজ না করলে এখান থেকে টাইপ করে টেস্ট করতে পারবেন) -->
+    <div class="control-panel">
+        <input type="text" id="user-input" placeholder="এখানে কমান্ড লিখুন..." autocomplete="off">
+        <button onclick="sendManualCommand()">পাঠান</button>
     </div>
-
-    <!-- ফ্লোটিং স্ট্যাটাস -->
-    <div id="floating-status">🎙️ শুনছি...</div>
 
     <!-- স্ক্রিপ্ট লজিক -->
     <script type="module">
@@ -152,8 +153,6 @@
         const GEMINI_API_KEY = "AQ.Ab8RN6IEF-dUdQd8i1GSGKK7VEjBLl3FixNZI-951isnS7IlMA";
 
         let robotMemory = { name: "চিঠি রোবট", rules: [] };
-        let recognition = null;
-        let isRobotSpeaking = false;
 
         function logDebug(msg) {
             const debugBox = document.getElementById('debug-log');
@@ -163,81 +162,37 @@
 
         window.onload = function() {
             loadFirebaseMemory();
-            initSpeechRecognition();
-            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট প্রস্তুত আছি। বলুন কী করতে হবে?");
+            speakAndDisplay("হ্যালো ওনার! আমি প্রস্তুত আছি।");
         };
 
         function loadFirebaseMemory() {
             const dbRef = ref(db, 'chitti_ai_core/');
             onValue(dbRef, (snapshot) => {
                 let data = snapshot.val();
-                if (data) {
-                    if (data.name) {
-                        robotMemory.name = data.name;
-                        document.getElementById('ai-name').innerText = data.name;
-                    }
-                    if (data.rules) {
-                        robotMemory.rules = data.rules;
-                        document.getElementById('rules-list').innerText = data.rules.join(', ');
-                    }
+                if (data && data.name) {
+                    robotMemory.name = data.name;
+                    document.getElementById('ai-name').innerText = data.name;
                 }
             });
         }
 
-        function initSpeechRecognition() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                logDebug("ব্রাউজারে SpeechRecognition সাপোর্ট করছে না!");
-                return;
+        window.sendManualCommand = function() {
+            let inputField = document.getElementById('user-input');
+            let text = inputField.value.trim();
+            if (text.length > 0) {
+                logDebug(`ম্যানুয়াল কমান্ড পাওয়া গেছে: "${text}"`);
+                inputField.value = "";
+                processWithGeminiAI(text);
             }
-
-            recognition = new SpeechRecognition();
-            recognition.lang = 'bn-BD';
-            recognition.continuous = false;
-            recognition.interimResults = false;
-
-            recognition.onstart = function() {
-                document.getElementById('floating-status').innerText = "🎙️ শুনছি...";
-            };
-
-            recognition.onresult = function(event) {
-                if (isRobotSpeaking) return;
-                let spokenText = event.results[0][0].transcript.trim();
-                logDebug(`ইউজার বলেছেন: "${spokenText}"`);
-                if (spokenText.length > 0) {
-                    processWithGeminiAI(spokenText);
-                }
-            };
-
-            recognition.onerror = function(event) {
-                logDebug(`মাইক এরর: ${event.error}`);
-                restartListening();
-            };
-
-            recognition.onend = function() {
-                if (!isRobotSpeaking) {
-                    setTimeout(restartListening, 400);
-                }
-            };
-
-            restartListening();
-        }
-
-        function restartListening() {
-            if (isRobotSpeaking) return;
-            try {
-                recognition.start();
-            } catch(e) {}
-        }
+        };
 
         async function processWithGeminiAI(userInput) {
-            try { recognition.stop(); } catch(e) {}
-            speakAndDisplay("চিহ্নিত করছি...");
+            speakAndDisplay("প্রসেস হচ্ছে...");
+            logDebug(`জেমিনি এআই এ রিকোয়েস্ট পাঠানো হচ্ছে...`);
 
             try {
-                // সরাসরি জেমিনি থেকে প্লেইন টেক্সট উত্তর নেওয়ার ব্যবস্থা করা হলো যাতে JSON ভাঙার কোনো ঝামেলা না থাকে
-                let prompt = `তুমি একজন অটোনমাস রোবট যার নাম "${robotModelName()}". ইউজার বাংলায় একটি কথা বলেছেন: "${userInput}". 
-                তুমি একদম সাবলীল বাংলায় ইউজারের কথার উত্তর দাও বা তার সাথে আলোচনা করো। যদি ইউজার কোনো রুলস বা নাম পরিবর্তন করতে বলে, তবে তোমার উত্তরে পরিষ্কার জানিয়ে দাও যে তুমি সেটি ফায়ারবেসে সেভ করতে প্রস্তুত কি না।`;
+                let prompt = `তুমি একজন অটোনমাস রোবট যার নাম "${robotMemory.name}"। ইউজার একটি কমান্ড দিয়েছেন: "${userInput}". 
+                তুমি একদম সাবলীল বাংলায় সরাসরি জুতসই উত্তর দাও। কোডিং বা অন্য কোনো জটিল ফরম্যাটে যাওয়ার দরকার নেই, শুধু সাধারণ টেক্সট উত্তর দাও।`;
 
                 let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
@@ -245,49 +200,34 @@
                     body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                 });
 
-                let result = await response.json();
-                let aiReply = result.candidates[0].content.parts[0].text;
-                
-                logDebug(`জেমিনি রেসপন্স সফল.`);
-                speakAndDisplay(aiReply);
+                if (!response.ok) {
+                    throw new Error(`HTTP Error: ${response.status}`);
+                }
 
-                // যদি ইউজার নির্দিষ্ট করে বলে নাম বা রুলস রাখতে
-                if (userInput.includes("নাম") || userInput.includes("রোবট")) {
-                    let newName = userInput.replace("নাম", "").replace("পরিবর্তন", "").trim();
-                    if(newName.length > 2) {
-                        set(ref(db, 'chitti_ai_core/name'), newName);
-                        logDebug(`ডাটাবেজ আপডেট: নাম = ${newName}`);
-                    }
+                let result = await response.json();
+                
+                if (result.candidates && result.candidates[0].content) {
+                    let aiReply = result.candidates[0].content.parts[0].text;
+                    logDebug(`সফল রেসপন্স প্রাপ্ত.`);
+                    speakAndDisplay(aiReply);
+                } else {
+                    throw new Error("জেমিনি থেকে সঠিক ফরম্যাটে ডেটা আসেনি।");
                 }
 
             } catch (error) {
                 logDebug(`ত্রুটি ধরা পড়েছে: ${error.message}`);
-                speakAndDisplay("আপনার কথা বুঝতে পেরেছি ওনার। বলুন, আর কী নির্দেশ আছে?");
+                speakAndDisplay("দুঃখিত ওনার, সার্ভারের সাথে সংযোগে সমস্যা হয়েছে।");
             }
-        }
-
-        function robotModelName() {
-            return robotMemory.name;
         }
 
         function speakAndDisplay(text) {
             document.getElementById('robot-status').innerText = text;
-            document.getElementById('floating-status').innerText = "🤖 রোবট কথা বলছে...";
             
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'bn-BD';
                 utterance.rate = 1.0;
-                
-                isRobotSpeaking = true;
-
-                utterance.onend = function() {
-                    isRobotSpeaking = false;
-                    document.getElementById('floating-status').innerText = "🎙️ শুনছি...";
-                    setTimeout(restartListening, 400);
-                };
-
                 window.speechSynthesis.speak(utterance);
             }
         }
