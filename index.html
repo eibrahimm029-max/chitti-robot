@@ -159,22 +159,27 @@
             speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, প্রস্তুত আছি।");
         };
 
-        // ফায়ারবেস থেকে নাম এবং এপিআই কি রিমোটলি লোড করা হচ্ছে
+        // ফায়ারবেস থেকে নাম এবং এপিআই কি রিমোটলি লোড করা (উভয় পাথ থেকে সাপোর্ট করবে)
         function loadFirebaseConfigs() {
             onValue(ref(db, 'chitti_ai_core/'), (snapshot) => {
                 let data = snapshot.val();
-                if (data && data.name) {
-                    robotMemory.name = data.name;
-                    document.getElementById('ai-name').innerText = data.name;
+                if (data) {
+                    if (data.name) {
+                        robotMemory.name = data.name;
+                        document.getElementById('ai-name').innerText = data.name;
+                    }
+                    if (data.gemini_key) {
+                        dynamicApiKey = data.gemini_key;
+                        logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
+                    }
                 }
             });
 
             onValue(ref(db, 'gemini_key'), (snapshot) => {
-                dynamicApiKey = snapshot.val();
-                if (dynamicApiKey) {
+                let key = snapshot.val();
+                if (key && !dynamicApiKey) {
+                    dynamicApiKey = key;
                     logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
-                } else {
-                    logDebug("সতর্কতা: ফায়ারবেসে 'gemini_key' পাওয়া যায়নি।");
                 }
             });
         }
