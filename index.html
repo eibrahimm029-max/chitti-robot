@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Chitti Robot - Permanent Secure</title>
+    <title>Autonomous Chitti Robot - Gemini Official</title>
     <style>
         body {
             background-color: #050505;
@@ -114,12 +114,12 @@
             <div class="eye"></div>
         </div>
         <h3 id="ai-name" style="margin: 0 0 2px 0; color: #fff; font-size: 13px;">চিঠি রোবট</h3>
-        <p id="robot-status">নিরাপদ সিস্টেম প্রস্তুত...</p>
+        <p id="robot-status">জেমিনি সিস্টেম প্রস্তুত...</p>
     </div>
 
     <div class="debug-panel" id="debug-log">
-        <strong>🛡️ সিকিউর কনসোল:</strong><br>
-        > সিস্টেম সফলভাবে চালু হয়েছে...
+        <strong>🛡️ জেমিনি কনসোল:</strong><br>
+        > সিস্টেম সফলভাবে লোড হয়েছে...
     </div>
 
     <div class="control-panel">
@@ -145,6 +145,9 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
+        // আপনার দেওয়া জেমিনি এপিআই কি
+        const GEMINI_API_KEY = "AQ.Ab8RN6Ie9NismsWKg6NqSHbXd16JXOuVTSdJ-Z9qbUjDJhbqnw";
+
         let robotMemory = { name: "চিঠি রোবট" };
 
         function logDebug(msg) {
@@ -155,7 +158,7 @@
 
         window.onload = function() {
             loadFirebaseMemory();
-            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, একদম সুরক্ষিতভাবে প্রস্তুত আছি।");
+            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, জেমিনির সাথে সংযুক্ত আছি।");
         };
 
         function loadFirebaseMemory() {
@@ -175,47 +178,51 @@
             if (text.length > 0) {
                 logDebug(`কমান্ড পাঠানো হলো: "${text}"`);
                 inputField.value = "";
-                processSecurely(text);
+                processWithGemini(text);
             }
         };
 
-        async function processSecurely(userInput) {
-            speakAndDisplay("চিন্তা করছি...");
-            logDebug(`সিকিউর সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
+        async function processWithGemini(userInput) {
+            speakAndDisplay("ভাবছি...");
+            logDebug(`জেমিনি সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
 
             try {
-                // সরাসরি ব্রাউজার থেকে ওপেনএআই এপিআই কল করার পরিবর্তে 
-                // আমরা একটি অত্যন্ত দ্রুতগতির ফ্রি সার্ভার প্রক্সি এন্ডপয়েন্ট ব্যবহার করছি যা কোনো এপিআই কি এক্সপোজ করে না।
-                const backendUrl = "https://aichat-proxy-service.onrender.com/chat"; // অথবা ব্যাকএন্ড মিডলওয়্যার লিংক
+                // জেমিনির অফিশিয়াল এন্ডপয়েন্ট ও প্রোটোকল
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`;
 
-                const response = await fetch(backendUrl, {
+                const response = await fetch(url, {
                     method: "POST",
                     headers: {
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        message: userInput,
-                        robotName: robotMemory.name,
-                        apiKey: "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"
+                        contents: [
+                            {
+                                parts: [
+                                    { text: `তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি কখনই বলবে না যে তুমি এআই বা গুগল বা জেমিনি। তুমি সবসময় নিজেকে "${robotMemory.name}" হিসেবে পরিচয় দেবে এবং বাংলায় সাবলীল সংক্ষিপ্ত উত্তর দেবে। ব্যবহারকারীর কথা: ${userInput}` }
+                                ]
+                            }
+                        ]
                     })
                 });
 
                 let result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.error || `HTTP Error: ${response.status}`);
+                    throw new Error(result.error ? result.error.message : `HTTP Error: ${response.status}`);
                 }
 
-                if (result.reply) {
+                if (result.candidates && result.candidates.length > 0) {
+                    let aiReply = result.candidates[0].content.parts[0].text.trim();
                     logDebug(`সফল রেসপন্স প্রাপ্ত!`);
-                    speakAndDisplay(result.reply);
+                    speakAndDisplay(aiReply);
                 } else {
-                    throw new Error("সার্ভার থেকে সঠিক ফরম্যাটে উত্তর আসেনি।");
+                    throw new Error("জেমিনি থেকে সঠিক উত্তর পাওয়া যায়নি।");
                 }
 
             } catch (error) {
                 logDebug(`ত্রুটি: ${error.message}`);
-                speakAndDisplay("সংযোগ সফল হয়নি, দয়া করে আবার চেষ্টা করুন।");
+                speakAndDisplay("সার্ভার কানেকশন ত্রুটি।");
             }
         }
 
