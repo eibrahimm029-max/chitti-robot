@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Chitti Robot - Secure Firebase Remote</title>
+    <title>Autonomous Chitti Robot - Gemini Live</title>
     <style>
         body {
             background-color: #050505;
@@ -118,7 +118,7 @@
     </div>
 
     <div class="debug-panel" id="debug-log">
-        <strong>🛡️ রিমোট সিকিউর কনসোল:</strong><br>
+        <strong>🛡️ জেমিনি রিমোট কনসোল:</strong><br>
         > সিস্টেম লোড হচ্ছে...
     </div>
 
@@ -159,7 +159,7 @@
             speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, প্রস্তুত আছি।");
         };
 
-        // ফায়ারবেস থেকে নাম এবং এপিআই কি রিমোটলি লোড করা
+        // ফায়ারবেস থেকে এপিআই কি ও নাম লোড করা
         function loadFirebaseConfigs() {
             onValue(ref(db, 'chitti_ai_core/'), (snapshot) => {
                 let data = snapshot.val();
@@ -170,7 +170,7 @@
                     }
                     if (data.gemini_key) {
                         dynamicApiKey = data.gemini_key;
-                        logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
+                        logDebug("জেমিনি রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
                     }
                 }
             });
@@ -179,7 +179,7 @@
                 let key = snapshot.val();
                 if (key && !dynamicApiKey) {
                     dynamicApiKey = key;
-                    logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
+                    logDebug("জেমিনি রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
                 }
             });
         }
@@ -195,43 +195,41 @@
                 }
                 logDebug(`কমান্ড পাঠানো হলো: "${text}"`);
                 inputField.value = "";
-                processWithAI(text);
+                processWithGemini(text);
             }
         };
 
-        // CORS প্রক্সি সহ হাগিং ফেস এপিআই প্রসেসিং ফাংশন
-        async function processWithAI(userInput) {
+        // সরাসরি গুগল জেমিনি এপিআই ব্যবহার করার ফাংশন (কোনো প্রক্সি ছাড়াই কাজ করবে)
+        async function processWithGemini(userInput) {
             speakAndDisplay("ভাবছি...");
-            logDebug(`এআই সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
+            logDebug(`জেমিনি সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
 
             try {
-                const targetUrl = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2";
-                const proxyUrl = "https://corsproxy.io/?";
-
-                const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${dynamicApiKey.trim()}`;
+                
+                const response = await fetch(url, {
                     method: "POST",
                     headers: {
-                        "Authorization": `Bearer ${dynamicApiKey.trim()}`,
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        inputs: `[INST] তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি সবসময় নিজেকে "${robotMemory.name}" হিসেবে পরিচয় দেবে এবং বাংলায় সাবলীল সংক্ষিপ্ত উত্তর দেবে। ব্যবহারকারীর কথা: ${userInput} [/INST]`
+                        contents: [{
+                            parts: [{
+                                text: `তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি সবসময় নিজেকে "${robotMemory.name}" হিসেবে পরিচয় দেবে এবং বাংলায় সাবলীল ও সংক্ষিপ্ত উত্তর দেবে। ব্যবহারকারীর কথা: ${userInput}`
+                            }]
+                        }]
                     })
                 });
 
                 let result = await response.json();
 
                 if (!response.ok) {
-                    throw new Error(result.error || `HTTP Error: ${response.status}`);
+                    throw new Error(result.error?.message || `HTTP Error: ${response.status}`);
                 }
 
-                let aiReply = "";
-                if (Array.isArray(result) && result[0].generated_text) {
-                    aiReply = result[0].generated_text.split("[/INST]").pop().trim();
-                } else if (result.generated_text) {
-                    aiReply = result.generated_text.split("[/INST]").pop().trim();
-                } else {
-                    aiReply = "আমি বুঝতে পেরেছি!";
+                let aiReply = "আমি বুঝতে পেরেছি!";
+                if (result.candidates && result.candidates[0].content && result.candidates[0].content.parts[0].text) {
+                    aiReply = result.candidates[0].content.parts[0].text.trim();
                 }
 
                 logDebug(`সফল রেসপন্স প্রাপ্ত!`);
