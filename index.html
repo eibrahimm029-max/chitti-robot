@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Chitti Robot - Full Debug</title>
+    <title>Autonomous Chitti Robot - Final Fix</title>
     <style>
         body {
             background-color: #050505;
@@ -57,7 +57,6 @@
             overflow: hidden;
         }
 
-        /* ডিবাগ কনসোল প্যানেল */
         .debug-panel {
             width: 100%;
             max-width: 350px;
@@ -73,7 +72,6 @@
             text-align: left;
         }
 
-        /* কন্ট্রোল প্যানেল ও ইনপুট বক্স */
         .control-panel {
             width: 100%;
             max-width: 350px;
@@ -110,29 +108,25 @@
 </head>
 <body>
 
-    <!-- রোবটের ডিসপ্লে ও চোখ -->
     <div id="robot-face-box">
         <div class="eye-container">
             <div class="eye"></div>
             <div class="eye"></div>
         </div>
         <h3 id="ai-name" style="margin: 0 0 2px 0; color: #fff; font-size: 13px;">চিঠি রোবট</h3>
-        <p id="robot-status">সিস্টেম লোড হচ্ছে...</p>
+        <p id="robot-status">এপিআই কানেক্ট করা হয়েছে...</p>
     </div>
 
-    <!-- রিয়েল-টাইম ডিবাগ কনসোল -->
     <div class="debug-panel" id="debug-log">
         <strong>🛡️ লাইভ ডিবাগ কনসোল:</strong><br>
         > সিস্টেম রেডি...
     </div>
 
-    <!-- টেক্সট কমান্ড ইনপুট প্যানেল (ভয়েস কাজ না করলে এখান থেকে টাইপ করে টেস্ট করতে পারবেন) -->
     <div class="control-panel">
         <input type="text" id="user-input" placeholder="এখানে কমান্ড লিখুন..." autocomplete="off">
         <button onclick="sendManualCommand()">পাঠান</button>
     </div>
 
-    <!-- স্ক্রিপ্ট লজিক -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
@@ -150,7 +144,9 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-        const GEMINI_API_KEY = "AQ.Ab8RN6IEF-dUdQd8i1GSGKK7VEjBLl3FixNZI-951isnS7IlMA";
+        
+        // আপনার নতুন এপিআই কি এখানে সঠিকভাবে বসানো হয়েছে
+        const GEMINI_API_KEY = "AQ.Ab8RN6L4f5NHgS_MhbNUag4zEV0ORA9lzdGCULdL8DnpepWjOQ";
 
         let robotMemory = { name: "চিঠি রোবট", rules: [] };
 
@@ -162,7 +158,7 @@
 
         window.onload = function() {
             loadFirebaseMemory();
-            speakAndDisplay("হ্যালো ওনার! আমি প্রস্তুত আছি।");
+            speakAndDisplay("হ্যালো ওনার! আমি সম্পূর্ণ প্রস্তুত আছি।");
         };
 
         function loadFirebaseMemory() {
@@ -180,7 +176,7 @@
             let inputField = document.getElementById('user-input');
             let text = inputField.value.trim();
             if (text.length > 0) {
-                logDebug(`ম্যানুয়াল কমান্ড পাওয়া গেছে: "${text}"`);
+                logDebug(`কমান্ড পাওয়া গেছে: "${text}"`);
                 inputField.value = "";
                 processWithGeminiAI(text);
             }
@@ -188,11 +184,10 @@
 
         async function processWithGeminiAI(userInput) {
             speakAndDisplay("প্রসেস হচ্ছে...");
-            logDebug(`জেমিনি এআই এ রিকোয়েস্ট পাঠানো হচ্ছে...`);
+            logDebug(`জেমিনি এপিআই এ রিকোয়েস্ট পাঠানো হচ্ছে...`);
 
             try {
-                let prompt = `তুমি একজন অটোনমাস রোবট যার নাম "${robotMemory.name}"। ইউজার একটি কমান্ড দিয়েছেন: "${userInput}". 
-                তুমি একদম সাবলীল বাংলায় সরাসরি জুতসই উত্তর দাও। কোডিং বা অন্য কোনো জটিল ফরম্যাটে যাওয়ার দরকার নেই, শুধু সাধারণ টেক্সট উত্তর দাও।`;
+                let prompt = `তুমি একজন অটোনমাস রোবট যার নাম "${robotMemory.name}"। ইউজার একটি কমান্ড দিয়েছেন: "${userInput}". শুধু সাবলীল বাংলায় উত্তর দাও।`;
 
                 let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
@@ -216,7 +211,7 @@
 
             } catch (error) {
                 logDebug(`ত্রুটি ধরা পড়েছে: ${error.message}`);
-                speakAndDisplay("দুঃখিত ওনার, সার্ভারের সাথে সংযোগে সমস্যা হয়েছে।");
+                speakAndDisplay("সার্ভার এরর: দয়া করে চেক করুন।");
             }
         }
 
