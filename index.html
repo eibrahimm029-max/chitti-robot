@@ -107,7 +107,7 @@
         <div id="rules-list" style="color: #00ffcc; max-height: 80px; overflow-y: auto;">কোনো কমান্ড রেকর্ড হয়নি।</div>
     </div>
 
-    <div id="floating-status">🎙️ কান সজাগ রয়েছে</div>
+    <div id="floating-status">🎙️ কান সবসময় সজাগ</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -137,11 +137,10 @@
         };
 
         let recognition = null;
-        let isSpeaking = false; // রোবট কথা বলার সময় ট্র্যাক রাখার জন্য
 
         window.onload = function() {
             loadFirebaseMemory();
-            startContinuousAutonomousListener();
+            startAlwaysOnListener();
             speakAndDisplay("সিস্টেম পুরোপুরি লাইভ। বলুন ওনার, কী করতে হবে?");
         };
 
@@ -162,48 +161,45 @@
             });
         }
 
-        function startContinuousAutonomousListener() {
+        function startAlwaysOnListener() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) return;
 
             recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
-            recognition.continuous = false; // একবারে একটি কমান্ড শোনার জন্য ফ্লেক্সিবল করা হলো
+            recognition.continuous = true; // সব সময় চালু থাকবে
             recognition.interimResults = false;
 
             recognition.onresult = function(event) {
-                if (isSpeaking) return; // রোবট কথা বললে ইউজারের কথা ইগনোর করবে
                 let spokenText = event.results[event.results.length - 1][0].transcript.trim();
-                processWithGeminiAI(spokenText);
+                if (spokenText.length > 1) {
+                    processWithGeminiAI(spokenText);
+                }
             };
 
+            // মাইক্রোফোন কোনো কারণে বন্ধ হতে চাইলে সাথে সাথে রিস্টার্ট করবে (কোনো বিরতি ছাড়াই)
             recognition.onerror = function() { 
-                if (!isSpeaking) {
-                    try { recognition.start(); } catch(e) {} 
-                }
+                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100); 
             };
             
             recognition.onend = function() { 
-                if (!isSpeaking) {
-                    try { recognition.start(); } catch(e) {} 
-                }
+                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100); 
             };
 
             try { recognition.start(); } catch(e) {}
         }
 
         async function processWithGeminiAI(userInput) {
-            if (isSpeaking) return;
-            speakAndDisplay("বিশ্লেষণ করা হচ্ছে...");
+            speakAndDisplay("বলা হচ্ছে...");
 
             try {
                 let prompt = `তুমি একজন অটোনমাস রোবট যার নাম "${robotMemory.name}"। ইউজার বাংলায় একটি কমান্ড দিয়েছেন: "${userInput}". 
-                এই কমান্ড থেকে বের করে আনো যে ইউজার কী করতে চাচ্ছেন (যেমন: নাম পরিবর্তন, নতুন রুলস যোগ করা, ফায়ারওয়াল আপডেট বা অন্য কিছু)। 
+                এই কমান্ড থেকে বের করে আনো যে ইউজার কী করতে চাচ্ছেন (যেমন: নাম পরিবর্তন, নতুন রুলস যোগ করা বা সাধারণ কথা বলা)। 
                 আমাকে শুধু JSON ফরম্যাটে উত্তর দাও নিচের মতো করে:
                 {
-                  "actionType": "rename/rule/security/other",
-                  "extractedValue": "নতুন মান বা রুলস",
-                  "replyMessage": "রোবটের মুখে বলার মতো একটি চমৎকার বাংলা উত্তর"
+                  "actionType": "rename/rule/other",
+                  "extractedValue": "নতুন মান বা রুলস বা সংক্ষিপ্ত উত্তর",
+                  "replyMessage": "রোবটের মুখে বলার মতো একটি চমৎকার সাবলীল বাংলা উত্তর"
                 }`;
 
                 let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -218,37 +214,32 @@
                 let textResponse = result.candidates[0].content.parts[0].text;
                 
                 let jsonStart = textResponse.indexOf('{');
-                let jsonEnd = textResponse.lastIndexOf('}') + 1;
-                let aiData = JSON.parse(textResponse.substring(jsonStart, jsonEnd));
+                let jsonEnd = textResponse.lastIndexOf('}') +: textResponse.lastIndexOf('}');
+                let cleanedJson = textResponse.substring(textResponse.indexOf('{'), textResponse.lastIndexOf('}') + 1);
+                let aiData = JSON.parse(cleanedJson);
 
                 executeAiCommand(aiData);
 
             } catch (error) {
-                fallbackLocalExecution(userInput);
+                // জেমিনি প্রসেস করতে না পারলে সরাসরি আপনার কথাটি সাধারণ চ্যাট হিসেবে উত্তর দেবে
+                speakAndDisplay("আপনার কথা বুঝতে পেরেছি ওনার। বলুন কী করতে হবে?");
             }
         }
 
         function executeAiCommand(data) {
-            let reply = data.replyMessage || "নির্দেশ সফলভাবে কার্যকর করা হয়েছে।";
+            let reply = data.replyMessage || "বুঝেছি ওনার।";
 
             if (data.actionType === "rename") {
                 robotMemory.name = data.extractedValue;
                 set(ref(db, 'chitti_ai_core/name'), robotMemory.name);
                 document.getElementById('ai-name').innerText = robotMemory.name;
-            } else {
+            } else if (data.actionType === "rule" && data.extractedValue) {
                 robotMemory.rules.push(data.extractedValue);
                 set(ref(db, 'chitti_ai_core/rules'), robotMemory.rules);
                 updateRulesUI();
             }
 
             speakAndDisplay(reply);
-        }
-
-        function fallbackLocalExecution(text) {
-            robotMemory.rules.push(text);
-            set(ref(db, 'chitti_ai_core/rules'), robotMemory.rules);
-            updateRulesUI();
-            speakAndDisplay("আপনার কমান্ডটি ফায়ারবেসে সেভ করা হয়েছে ওনার।");
         }
 
         function updateRulesUI() {
@@ -263,25 +254,10 @@
         function speakAndDisplay(text) {
             document.getElementById('robot-status').innerText = text;
             if ('speechSynthesis' in window) {
-                isSpeaking = true; // রোবটের বলা শুরু, মাইক্রোফোন বন্ধ
-                if (recognition) {
-                    try { recognition.stop(); } catch(e) {}
-                }
-
                 window.speechSynthesis.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'bn-BD';
                 utterance.rate = 1.0;
-                
-                utterance.onend = function() {
-                    isSpeaking = false; // রোবটের বলা শেষ, আবার মাইক্রোফোন চালু
-                    setTimeout(() => {
-                        if (recognition) {
-                            try { recognition.start(); } catch(e) {}
-                        }
-                    }, 1000);
-                };
-
                 window.speechSynthesis.speak(utterance);
             }
         }
