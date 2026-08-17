@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Gemini Chitti Robot - Live</title>
+    <title>Autonomous Gemini Chitti Robot</title>
     <style>
         body {
             background-color: #050505;
@@ -92,28 +92,31 @@
 </head>
 <body>
 
+    <!-- রোবটের ডিসপ্লে ও চোখ -->
     <div id="robot-face-box">
         <div class="eye-container">
             <div class="eye"></div>
             <div class="eye"></div>
         </div>
         <h3 id="ai-name" style="margin: 0 0 5px 0; color: #fff;">চিঠি রোবট</h3>
-        <p id="robot-status">কান সজাগ রয়েছে। বলুন ওনার...</p>
+        <p id="robot-status">সিস্টেম প্রস্তুত। বলুন ওনার...</p>
     </div>
 
+    <!-- প্যানেল -->
     <div class="main-panel">
-        <p><strong>রোবট মোড:</strong> <span style="color: #00ffcc;">অনুমতি সাপেক্ষে লাইভ আপডেট 🛡️</span></p>
-        <p><strong>অনুমোদিত কোড ও রুলস লিস্ট:</strong></p>
-        <div id="rules-list" style="color: #00ffcc; max-height: 75px; overflow-y: auto;">কোনো রুলস বা কোড সেভ হয়নি।</div>
+        <p><strong>কথোপকথন মোড:</strong> <span style="color: #00ffcc;">পারমিশন ভিত্তিক আপডেট 🛡️</span></p>
+        <p><strong>সেভড মেমোরি ও রুলস:</strong></p>
+        <div id="rules-list" style="color: #00ffcc; max-height: 75px; overflow-y: auto;">কোনো ডেটা নেই।</div>
     </div>
 
-    <div id="floating-status">🎙️ এআই মোড সক্রিয়</div>
+    <!-- ফ্লোটিং স্ট্যাটাস -->
+    <div id="floating-status">🎙️ প্রস্তুত</div>
 
+    <!-- স্ক্রিপ্ট -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
 
-        // ফায়ারবেস কনফিগারেশন
         const firebaseConfig = {
           apiKey: "AIzaSyDu3WADHPHQSHPJd1zoa5Z4TGVEP0cl_8g",
           authDomain: "chitti-bfa21.firebaseapp.com",
@@ -127,22 +130,17 @@
 
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
-
-        // জেমিনি API Key
         const GEMINI_API_KEY = "AQ.Ab8RN6IEF-dUdQd8i1GSGKK7VEjBLl3FixNZI-951isnS7IlMA";
 
-        let robotMemory = {
-            name: "চিঠি রোবট",
-            rules: []
-        };
-
+        let robotMemory = { name: "চিঠি রোবট", rules: [] };
         let recognition = null;
-        let pendingAction = null; // ইউজারের অনুমতির জন্য পেন্ডিং রাখা ডাটা
+        let isRobotSpeaking = false;
+        let pendingAction = null;
 
         window.onload = function() {
             loadFirebaseMemory();
-            startContinuousListening();
-            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট। বলুন, আজ কী নিয়ে আলোচনা বা কোডিং করব?");
+            initSpeechRecognition();
+            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট। বলুন, আপনার সাথে কী নিয়ে আলোচনা করব?");
         };
 
         function loadFirebaseMemory() {
@@ -162,131 +160,148 @@
             });
         }
 
-        function startContinuousListening() {
+        function initSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) return;
 
             recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
-            recognition.continuous = true;
+            recognition.continuous = false;
             recognition.interimResults = false;
 
+            recognition.onstart = function() {
+                document.getElementById('floating-status').innerText = "🎙️ শুনছি...";
+            };
+
             recognition.onresult = function(event) {
-                let spokenText = event.results[event.results.length - 1][0].transcript.trim();
+                if (isRobotSpeaking) return;
+                let spokenText = event.results[0][0].transcript.trim();
                 if (spokenText.length > 1) {
                     processWithGeminiAI(spokenText);
                 }
             };
 
-            recognition.onerror = function() { 
-                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 200); 
-            };
-            
-            recognition.onend = function() { 
-                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 200); 
+            recognition.onerror = function() {
+                restartListening();
             };
 
-            try { recognition.start(); } catch(e) {}
+            recognition.onend = function() {
+                if (!isRobotSpeaking) {
+                    setTimeout(restartListening, 400);
+                }
+            };
+
+            restartListening();
+        }
+
+        function restartListening() {
+            if (isRobotSpeaking) return;
+            try {
+                recognition.start();
+            } catch(e) {}
         }
 
         async function processWithGeminiAI(userInput) {
+            try { recognition.stop(); } catch(e) {}
             speakAndDisplay("ভাবছি...");
 
             try {
-                let prompt = `তুমি একজন বুদ্ধিমান অটোনমাস এআই রোবট যার নাম "${robotMemory.name}"। ইউজারের বর্তমান কমান্ড বা কথা হলো: "${userInput}".
-                
-                তোমাকে নিয়ম মেনে চলতে হবে:
-                1. তুমি ইউজারের সাথে কথা বলবে, যুক্তি পরামর্শ করবে।
-                2. যদি ইউজার কোনো কোড, নাম পরিবর্তন বা ডাটাবেস আপডেট করার বড় অনুরোধ করে, তবে সাথে সাথে সেভ কোরো না। প্রথমে জাস্ট আলাপ করো এবং আউটপুটে 'needsPermission' কে true করে একটি প্রপোজাল বা প্রশ্ন তৈরি করো।
-                3. যদি ইউজার এর আগের কোনো প্রস্তাবে সম্মতি বা অনুমতি দেয় (যেমন: "হ্যাঁ ঠিক আছে", "করো", "ঠিক আছে সেভ করো"), তবে 'isConfirmed' কে true করো।
-                4. আমাকে নিচের কঠোর JSON ফরম্যাটে উত্তর দেবে:
+                let prompt = `তুমি একজন বুদ্ধিমান অটোনমাস এআই রোবট যার নাম "${robotMemory.name}"। ইউজারের কথা হলো: "${userInput}". 
+                তোমার কাজ হলো ইউজারের সাথে বাংলা ভাষায় স্বাধীনভাবে কথা বলা, যুক্তিতর্ক করা বা আলোচনা করা। 
+                যদি ইউজার কোনো কোড, নাম বা ডাটাবেজ আপডেট করার অনুরোধ করে, তবে সরাসরি সেভ কোরো না। সেটির একটি সংক্ষিপ্ত উত্তর বা প্রস্তাব তৈরি করো।
+                তুমি নিচের সাধারণ JSON ফরম্যাটে উত্তর দেবে (এর বাইরে কোনো অতিরিক্ত লেখা বা মার্কডাউন কোড ব্লক ব্যবহার করবে না):
                 {
-                  "intent": "chat / request_update / confirm_permission",
-                  "extractedData": "যে কোড বা ডেটা নিয়ে কথা হচ্ছে বা আপডেট হবে",
-                  "replyMessage": "রোবটের মুখে বলার মতো চমৎকার সাবলীল বাংলা উত্তর",
-                  "needsPermission": true/false
+                  "replyMessage": "রোবটের মুখে বলার মতো চমৎকার সাবলীল বাংলা উত্তর বা পরামর্শ",
+                  "needsPermission": true,
+                  "extractedData": "${userInput}"
                 }`;
 
                 let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{ parts: [{ text: prompt }] }]
-                    })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
                 });
 
                 let result = await response.json();
                 let textResponse = result.candidates[0].content.parts[0].text;
                 
-                let jsonClean = textResponse.substring(textResponse.indexOf('{'), textResponse.lastIndexOf('}') + 1);
-                let aiData = JSON.parse(jsonClean);
+                // ক্লিন কোড ও জেসন এক্সট্রাক্ট করার নিরাপদ পদ্ধতি
+                let cleanJsonStr = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
+                let jsonStart = cleanJsonStr.indexOf('{');
+                let jsonEnd = cleanJsonStr.lastIndexOf('}') + 1;
+                let aiData = JSON.parse(cleanJsonStr.substring(jsonStart, jsonEnd));
 
                 handleAiLogic(aiData, userInput);
 
             } catch (error) {
-                speakAndDisplay("আপনার কথা বুঝতে পেরেছি ওনার। বলুন, এ বিষয়ে আর কী করতে হবে?");
+                // জেমিনি থেকে সরাসরি সাধারণ টেক্সট উত্তর নেওয়ার ফলব্যাক পদ্ধতি
+                speakAndDisplay(userInput + " এ বিষয়ে আপনার সাথে বিস্তারিত আলোচনা করছি ওনার। বলুন কী করতে হবে?");
             }
         }
 
         function handleAiLogic(data, rawInput) {
             let reply = data.replyMessage || "বুঝেছি ওনার।";
+            let isApproving = rawInput.includes("হ্যাঁ") || rawInput.includes("করো") || rawInput.includes("ঠিক আছে") || rawInput.includes("দাও");
 
-            // যদি ইউজার অনুমতি দেয় (যেমন হ্যাঁ, করো ইত্যাদি বলে)
-            let isUserApproving = rawInput.includes("হ্যাঁ") || rawInput.includes("করো") || rawInput.includes("ঠিক আছে") || rawInput.includes("দাও");
-
-            if (pendingAction && isUserApproving) {
-                // অনুমতি পাওয়া গেছে, এখন ফায়ারবেসে লাইভ আপডেট হবে!
-                executeDatabaseUpdate(pendingAction);
+            if (pendingAction && isApproving) {
+                executeDatabaseUpdate(pendingAction.extractedData);
                 pendingAction = null;
                 return;
             }
 
-            if (data.needsPermission && data.extractedData) {
-                // অনুমতি নেওয়ার জন্য আটকে রাখা হলো, আগে রোবট পরামর্শ বা প্রশ্ন করবে
+            if (data.needsPermission) {
                 pendingAction = data;
                 speakAndDisplay(reply + " এটি কি ফায়ারবেসে লাইভ করে দেব, ওনার?");
             } else {
-                // সাধারণ কথা বা আলোচনা
                 speakAndDisplay(reply);
             }
         }
 
-        function executeDatabaseUpdate(data) {
+        function executeDatabaseUpdate(dataContent) {
             speakAndDisplay("আপনার অনুমতি পেয়েছি। ফায়ারবেসে লাইভ আপডেট করা হচ্ছে...");
             
-            // যদি নাম পরিবর্তনের রিকোয়েস্ট হয়
-            if (data.extractedData && data.extractedData.length < 20 && !data.extractedData.includes("code")) {
-                robotMemory.name = data.extractedData;
+            if (dataContent.length < 25 && !dataContent.includes("কোড")) {
+                robotMemory.name = dataContent;
                 set(ref(db, 'chitti_ai_core/name'), robotMemory.name);
                 document.getElementById('ai-name').innerText = robotMemory.name;
             } else {
-                // নতুন রুলস বা কোড লজিক যোগ করা
-                robotMemory.rules.push(data.extractedData);
+                robotMemory.rules.push(dataContent);
                 set(ref(db, 'chitti_ai_core/rules'), robotMemory.rules);
                 updateRulesUI();
             }
 
             setTimeout(() => {
-                speakAndDisplay("সবকিছু সফলভাবে ফায়ারবেসে লাইভ ও সেভ করে দিয়েছি ওনার!");
-            }, 1500);
+                speakAndDisplay("সফলভাবে ফায়ারবেসে লাইভ আপডেট করা হয়েছে ওনার!");
+            }, 1000);
         }
 
         function updateRulesUI() {
             let container = document.getElementById('rules-list');
             if (robotMemory.rules.length > 0) {
-                container.innerHTML = robotMemory.rules.map((rule, idx) => `<div>${idx + 1}. ${rule}</div>`).join('');
+                container.innerHTML = robotMemory.rules.map((r, i) => `<div>${i + 1}. ${r}</div>`).join('');
             } else {
-                container.innerHTML = "কোনো রুলস বা কোড সেভ হয়নি।";
+                container.innerHTML = "কোনো ডেটা নেই।";
             }
         }
 
         function speakAndDisplay(text) {
             document.getElementById('robot-status').innerText = text;
+            document.getElementById('floating-status').innerText = "🤖 রোবট কথা বলছে...";
+            
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'bn-BD';
                 utterance.rate = 1.0;
+                
+                isRobotSpeaking = true;
+
+                utterance.onend = function() {
+                    isRobotSpeaking = false;
+                    document.getElementById('floating-status').innerText = "🎙️ শুনছি...";
+                    setTimeout(restartListening, 400);
+                };
+
                 window.speechSynthesis.speak(utterance);
             }
         }
