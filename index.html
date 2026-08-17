@@ -92,7 +92,6 @@
 </head>
 <body>
 
-    <!-- রোবটের ডিসপ্লে ও চোখ -->
     <div id="robot-face-box">
         <div class="eye-container">
             <div class="eye"></div>
@@ -102,17 +101,14 @@
         <p id="robot-status">ফায়ারবেস লাইভ ও জেমিনি প্রস্তুত। শুনছি...</p>
     </div>
 
-    <!-- রিয়েল-টাইম মেমোরি ও রুলস প্যানেল -->
     <div class="main-panel">
         <p><strong>ফায়ারওয়াল ও সিকিউরিটি:</strong> <span id="fw-status" style="color: #00ffcc;">মিলিটারি-গ্রেড এনক্রিপ্টেড 🛡️</span></p>
         <p><strong>অটো-সেভড কমান্ড ও রুলস:</strong></p>
         <div id="rules-list" style="color: #00ffcc; max-height: 80px; overflow-y: auto;">কোনো কমান্ড রেকর্ড হয়নি।</div>
     </div>
 
-    <!-- ফ্লোটিং ভয়েস স্ট্যাটাস -->
     <div id="floating-status">🎙️ কান সজাগ রয়েছে</div>
 
-    <!-- ফায়ারবেস ও জেমিনি লজিক স্ক্রিপ্ট -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
@@ -139,6 +135,9 @@
             name: "চিঠি রোবট",
             rules: []
         };
+
+        let recognition = null;
+        let isSpeaking = false; // রোবট কথা বলার সময় ট্র্যাক রাখার জন্য
 
         window.onload = function() {
             loadFirebaseMemory();
@@ -167,23 +166,34 @@
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) return;
 
-            const recognition = new SpeechRecognition();
+            recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
-            recognition.continuous = true;
+            recognition.continuous = false; // একবারে একটি কমান্ড শোনার জন্য ফ্লেক্সিবল করা হলো
             recognition.interimResults = false;
 
             recognition.onresult = function(event) {
+                if (isSpeaking) return; // রোবট কথা বললে ইউজারের কথা ইগনোর করবে
                 let spokenText = event.results[event.results.length - 1][0].transcript.trim();
                 processWithGeminiAI(spokenText);
             };
 
-            recognition.onerror = function() { try { recognition.start(); } catch(e) {} };
-            recognition.onend = function() { try { recognition.start(); } catch(e) {} };
+            recognition.onerror = function() { 
+                if (!isSpeaking) {
+                    try { recognition.start(); } catch(e) {} 
+                }
+            };
+            
+            recognition.onend = function() { 
+                if (!isSpeaking) {
+                    try { recognition.start(); } catch(e) {} 
+                }
+            };
 
             try { recognition.start(); } catch(e) {}
         }
 
         async function processWithGeminiAI(userInput) {
+            if (isSpeaking) return;
             speakAndDisplay("বিশ্লেষণ করা হচ্ছে...");
 
             try {
@@ -253,10 +263,25 @@
         function speakAndDisplay(text) {
             document.getElementById('robot-status').innerText = text;
             if ('speechSynthesis' in window) {
+                isSpeaking = true; // রোবটের বলা শুরু, মাইক্রোফোন বন্ধ
+                if (recognition) {
+                    try { recognition.stop(); } catch(e) {}
+                }
+
                 window.speechSynthesis.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'bn-BD';
                 utterance.rate = 1.0;
+                
+                utterance.onend = function() {
+                    isSpeaking = false; // রোবটের বলা শেষ, আবার মাইক্রোফোন চালু
+                    setTimeout(() => {
+                        if (recognition) {
+                            try { recognition.start(); } catch(e) {}
+                        }
+                    }, 1000);
+                };
+
                 window.speechSynthesis.speak(utterance);
             }
         }
