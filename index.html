@@ -22,7 +22,7 @@
         #robot-face-box {
             width: 100%;
             max-width: 350px;
-            height: 180px;
+            height: 190px;
             background: #000;
             border: 2px solid #00ffcc;
             border-radius: 15px;
@@ -30,8 +30,8 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
-            margin-top: 20px;
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.5);
+            margin-top: 15px;
             padding: 15px;
             box-sizing: border-box;
             text-align: center;
@@ -41,11 +41,11 @@
             display: flex;
             justify-content: space-around;
             width: 80px;
-            margin-bottom: 10px;
+            margin-bottom: 12px;
         }
         .eye {
-            width: 15px;
-            height: 25px;
+            width: 16px;
+            height: 26px;
             background: #00ffcc;
             border-radius: 10px;
             animation: blink 4s infinite;
@@ -98,16 +98,16 @@
             <div class="eye"></div>
         </div>
         <h3 id="ai-name" style="margin: 0 0 5px 0; color: #fff;">চিঠি রোবট</h3>
-        <p id="robot-status">ফায়ারবেস লাইভ ও জেমিনি প্রস্তুত। শুনছি...</p>
+        <p id="robot-status">কান সজাগ রয়েছে। বলুন ওনার...</p>
     </div>
 
     <div class="main-panel">
-        <p><strong>ফায়ারওয়াল ও সিকিউরিটি:</strong> <span id="fw-status" style="color: #00ffcc;">মিলিটারি-গ্রেড এনক্রিপ্টেড 🛡️</span></p>
-        <p><strong>অটো-সেভড কমান্ড ও রুলস:</strong></p>
-        <div id="rules-list" style="color: #00ffcc; max-height: 80px; overflow-y: auto;">কোনো কমান্ড রেকর্ড হয়নি।</div>
+        <p><strong>রোবট মোড:</strong> <span style="color: #00ffcc;">অনুমতি সাপেক্ষে লাইভ আপডেট 🛡️</span></p>
+        <p><strong>অনুমোদিত কোড ও রুলস লিস্ট:</strong></p>
+        <div id="rules-list" style="color: #00ffcc; max-height: 75px; overflow-y: auto;">কোনো রুলস বা কোড সেভ হয়নি।</div>
     </div>
 
-    <div id="floating-status">🎙️ কান সবসময় সজাগ</div>
+    <div id="floating-status">🎙️ এআই মোড সক্রিয়</div>
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
@@ -137,11 +137,12 @@
         };
 
         let recognition = null;
+        let pendingAction = null; // ইউজারের অনুমতির জন্য পেন্ডিং রাখা ডাটা
 
         window.onload = function() {
             loadFirebaseMemory();
-            startAlwaysOnListener();
-            speakAndDisplay("সিস্টেম পুরোপুরি লাইভ। বলুন ওনার, কী করতে হবে?");
+            startContinuousListening();
+            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট। বলুন, আজ কী নিয়ে আলোচনা বা কোডিং করব?");
         };
 
         function loadFirebaseMemory() {
@@ -161,13 +162,13 @@
             });
         }
 
-        function startAlwaysOnListener() {
+        function startContinuousListening() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
             if (!SpeechRecognition) return;
 
             recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
-            recognition.continuous = true; // সব সময় চালু থাকবে
+            recognition.continuous = true;
             recognition.interimResults = false;
 
             recognition.onresult = function(event) {
@@ -177,29 +178,33 @@
                 }
             };
 
-            // মাইক্রোফোন কোনো কারণে বন্ধ হতে চাইলে সাথে সাথে রিস্টার্ট করবে (কোনো বিরতি ছাড়াই)
             recognition.onerror = function() { 
-                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100); 
+                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 200); 
             };
             
             recognition.onend = function() { 
-                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 100); 
+                setTimeout(() => { try { recognition.start(); } catch(e) {} }, 200); 
             };
 
             try { recognition.start(); } catch(e) {}
         }
 
         async function processWithGeminiAI(userInput) {
-            speakAndDisplay("বলা হচ্ছে...");
+            speakAndDisplay("ভাবছি...");
 
             try {
-                let prompt = `তুমি একজন অটোনমাস রোবট যার নাম "${robotMemory.name}"। ইউজার বাংলায় একটি কমান্ড দিয়েছেন: "${userInput}". 
-                এই কমান্ড থেকে বের করে আনো যে ইউজার কী করতে চাচ্ছেন (যেমন: নাম পরিবর্তন, নতুন রুলস যোগ করা বা সাধারণ কথা বলা)। 
-                আমাকে শুধু JSON ফরম্যাটে উত্তর দাও নিচের মতো করে:
+                let prompt = `তুমি একজন বুদ্ধিমান অটোনমাস এআই রোবট যার নাম "${robotMemory.name}"। ইউজারের বর্তমান কমান্ড বা কথা হলো: "${userInput}".
+                
+                তোমাকে নিয়ম মেনে চলতে হবে:
+                1. তুমি ইউজারের সাথে কথা বলবে, যুক্তি পরামর্শ করবে।
+                2. যদি ইউজার কোনো কোড, নাম পরিবর্তন বা ডাটাবেস আপডেট করার বড় অনুরোধ করে, তবে সাথে সাথে সেভ কোরো না। প্রথমে জাস্ট আলাপ করো এবং আউটপুটে 'needsPermission' কে true করে একটি প্রপোজাল বা প্রশ্ন তৈরি করো।
+                3. যদি ইউজার এর আগের কোনো প্রস্তাবে সম্মতি বা অনুমতি দেয় (যেমন: "হ্যাঁ ঠিক আছে", "করো", "ঠিক আছে সেভ করো"), তবে 'isConfirmed' কে true করো।
+                4. আমাকে নিচের কঠোর JSON ফরম্যাটে উত্তর দেবে:
                 {
-                  "actionType": "rename/rule/other",
-                  "extractedValue": "নতুন মান বা রুলস বা সংক্ষিপ্ত উত্তর",
-                  "replyMessage": "রোবটের মুখে বলার মতো একটি চমৎকার সাবলীল বাংলা উত্তর"
+                  "intent": "chat / request_update / confirm_permission",
+                  "extractedData": "যে কোড বা ডেটা নিয়ে কথা হচ্ছে বা আপডেট হবে",
+                  "replyMessage": "রোবটের মুখে বলার মতো চমৎকার সাবলীল বাংলা উত্তর",
+                  "needsPermission": true/false
                 }`;
 
                 let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
@@ -213,33 +218,57 @@
                 let result = await response.json();
                 let textResponse = result.candidates[0].content.parts[0].text;
                 
-                let jsonStart = textResponse.indexOf('{');
-                let jsonEnd = textResponse.lastIndexOf('}') +: textResponse.lastIndexOf('}');
-                let cleanedJson = textResponse.substring(textResponse.indexOf('{'), textResponse.lastIndexOf('}') + 1);
-                let aiData = JSON.parse(cleanedJson);
+                let jsonClean = textResponse.substring(textResponse.indexOf('{'), textResponse.lastIndexOf('}') + 1);
+                let aiData = JSON.parse(jsonClean);
 
-                executeAiCommand(aiData);
+                handleAiLogic(aiData, userInput);
 
             } catch (error) {
-                // জেমিনি প্রসেস করতে না পারলে সরাসরি আপনার কথাটি সাধারণ চ্যাট হিসেবে উত্তর দেবে
-                speakAndDisplay("আপনার কথা বুঝতে পেরেছি ওনার। বলুন কী করতে হবে?");
+                speakAndDisplay("আপনার কথা বুঝতে পেরেছি ওনার। বলুন, এ বিষয়ে আর কী করতে হবে?");
             }
         }
 
-        function executeAiCommand(data) {
+        function handleAiLogic(data, rawInput) {
             let reply = data.replyMessage || "বুঝেছি ওনার।";
 
-            if (data.actionType === "rename") {
-                robotMemory.name = data.extractedValue;
+            // যদি ইউজার অনুমতি দেয় (যেমন হ্যাঁ, করো ইত্যাদি বলে)
+            let isUserApproving = rawInput.includes("হ্যাঁ") || rawInput.includes("করো") || rawInput.includes("ঠিক আছে") || rawInput.includes("দাও");
+
+            if (pendingAction && isUserApproving) {
+                // অনুমতি পাওয়া গেছে, এখন ফায়ারবেসে লাইভ আপডেট হবে!
+                executeDatabaseUpdate(pendingAction);
+                pendingAction = null;
+                return;
+            }
+
+            if (data.needsPermission && data.extractedData) {
+                // অনুমতি নেওয়ার জন্য আটকে রাখা হলো, আগে রোবট পরামর্শ বা প্রশ্ন করবে
+                pendingAction = data;
+                speakAndDisplay(reply + " এটি কি ফায়ারবেসে লাইভ করে দেব, ওনার?");
+            } else {
+                // সাধারণ কথা বা আলোচনা
+                speakAndDisplay(reply);
+            }
+        }
+
+        function executeDatabaseUpdate(data) {
+            speakAndDisplay("আপনার অনুমতি পেয়েছি। ফায়ারবেসে লাইভ আপডেট করা হচ্ছে...");
+            
+            // যদি নাম পরিবর্তনের রিকোয়েস্ট হয়
+            if (data.extractedData && data.extractedData.length < 20 && !data.extractedData.includes("code")) {
+                robotMemory.name = data.extractedData;
                 set(ref(db, 'chitti_ai_core/name'), robotMemory.name);
                 document.getElementById('ai-name').innerText = robotMemory.name;
-            } else if (data.actionType === "rule" && data.extractedValue) {
-                robotMemory.rules.push(data.extractedValue);
+            } else {
+                // নতুন রুলস বা কোড লজিক যোগ করা
+                robotMemory.rules.push(data.extractedData);
                 set(ref(db, 'chitti_ai_core/rules'), robotMemory.rules);
                 updateRulesUI();
             }
 
-            speakAndDisplay(reply);
+            setTimeout(() => {
+                speakAndDisplay("সবকিছু সফলভাবে ফায়ারবেসে লাইভ ও সেভ করে দিয়েছি ওনার!");
+            }, 1500);
         }
 
         function updateRulesUI() {
@@ -247,7 +276,7 @@
             if (robotMemory.rules.length > 0) {
                 container.innerHTML = robotMemory.rules.map((rule, idx) => `<div>${idx + 1}. ${rule}</div>`).join('');
             } else {
-                container.innerHTML = "কোনো কমান্ড রেকর্ড হয়নি।";
+                container.innerHTML = "কোনো রুলস বা কোড সেভ হয়নি।";
             }
         }
 
