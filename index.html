@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Chitti Robot - Gemini Official</title>
+    <title>Autonomous Chitti Robot - Secure Firebase Remote</title>
     <style>
         body {
             background-color: #050505;
@@ -114,12 +114,12 @@
             <div class="eye"></div>
         </div>
         <h3 id="ai-name" style="margin: 0 0 2px 0; color: #fff; font-size: 13px;">চিঠি রোবট</h3>
-        <p id="robot-status">জেমিনি সিস্টেম প্রস্তুত...</p>
+        <p id="robot-status">ডাটাবেজ থেকে সিকিউর লোডিং...</p>
     </div>
 
     <div class="debug-panel" id="debug-log">
-        <strong>🛡️ জেমিনি কনসোল:</strong><br>
-        > সিস্টেম সফলভাবে লোড হয়েছে...
+        <strong>🛡️ রিমোট সিকিউর কনসোল:</strong><br>
+        > সিস্টেম লোড হচ্ছে...
     </div>
 
     <div class="control-panel">
@@ -145,10 +145,8 @@
         const app = initializeApp(firebaseConfig);
         const db = getDatabase(app);
         
-        // আপনার দেওয়া জেমিনি এপিআই কি
-        const GEMINI_API_KEY = "AQ.Ab8RN6Ie9NismsWKg6NqSHbXd16JXOuVTSdJ-Z9qbUjDJhbqnw";
-
         let robotMemory = { name: "চিঠি রোবট" };
+        let dynamicApiKey = "";
 
         function logDebug(msg) {
             const debugBox = document.getElementById('debug-log');
@@ -157,17 +155,28 @@
         }
 
         window.onload = function() {
-            loadFirebaseMemory();
-            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, জেমিনির সাথে সংযুক্ত আছি।");
+            loadFirebaseConfigs();
+            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, প্রস্তুত আছি।");
         };
 
-        function loadFirebaseMemory() {
-            const dbRef = ref(db, 'chitti_ai_core/');
-            onValue(dbRef, (snapshot) => {
+        // ফায়ারবেস থেকে নাম এবং এপিআই কি রিমোটলি লোড করা হচ্ছে
+        function loadFirebaseConfigs() {
+            // রোবটের নাম লোড
+            onValue(ref(db, 'chitti_ai_core/'), (snapshot) => {
                 let data = snapshot.val();
                 if (data && data.name) {
                     robotMemory.name = data.name;
                     document.getElementById('ai-name').innerText = data.name;
+                }
+            });
+
+            // ডাটাবেজ থেকে সিক্রেট এপিআই কি লোড
+            onValue(ref(db, 'gemini_key'), (snapshot) => {
+                dynamicApiKey = snapshot.val();
+                if (dynamicApiKey) {
+                    logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
+                } else {
+                    logDebug("সতর্কতা: ফায়ারবেসে 'gemini_key' পাওয়া যায়নি।");
                 }
             });
         }
@@ -176,6 +185,11 @@
             let inputField = document.getElementById('user-input');
             let text = inputField.value.trim();
             if (text.length > 0) {
+                if (!dynamicApiKey) {
+                    logDebug("ত্রুটি: এপিআই কি লোড হয়নি।");
+                    speakAndDisplay("এপিআই কি পাওয়া যায়নি।");
+                    return;
+                }
                 logDebug(`কমান্ড পাঠানো হলো: "${text}"`);
                 inputField.value = "";
                 processWithGemini(text);
@@ -187,8 +201,7 @@
             logDebug(`জেমিনি সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
 
             try {
-                // জেমিনির অফিশিয়াল এন্ডপয়েন্ট ও প্রোটোকল
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY.trim()}`;
+                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${dynamicApiKey.trim()}`;
 
                 const response = await fetch(url, {
                     method: "POST",
