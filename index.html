@@ -3,14 +3,14 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Gemini Chitti Robot</title>
+    <title>Autonomous Chitti Robot - Debug Live</title>
     <style>
         body {
             background-color: #050505;
             color: #00ffcc;
             font-family: 'Courier New', monospace;
             margin: 0;
-            padding: 15px;
+            padding: 10px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -22,7 +22,7 @@
         #robot-face-box {
             width: 100%;
             max-width: 350px;
-            height: 190px;
+            height: 150px;
             background: #000;
             border: 2px solid #00ffcc;
             border-radius: 15px;
@@ -30,9 +30,8 @@
             flex-direction: column;
             justify-content: center;
             align-items: center;
-            box-shadow: 0 0 25px rgba(0, 255, 204, 0.5);
-            margin-top: 15px;
-            padding: 15px;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.4);
+            padding: 10px;
             box-sizing: border-box;
             text-align: center;
         }
@@ -40,14 +39,14 @@
         .eye-container {
             display: flex;
             justify-content: space-around;
-            width: 80px;
-            margin-bottom: 12px;
+            width: 70px;
+            margin-bottom: 8px;
         }
         .eye {
-            width: 16px;
-            height: 26px;
+            width: 14px;
+            height: 22px;
             background: #00ffcc;
-            border-radius: 10px;
+            border-radius: 8px;
             animation: blink 4s infinite;
         }
         @keyframes blink {
@@ -56,11 +55,27 @@
         }
 
         #robot-status {
-            font-size: 13px;
+            font-size: 12px;
             color: #00ffcc;
-            line-height: 1.4;
-            max-height: 70px;
+            line-height: 1.3;
+            max-height: 55px;
             overflow: hidden;
+        }
+
+        /* ডিবাগ কনসোল প্যানেল যা স্ক্রিনেই দেখাবে কী হচ্ছে */
+        .debug-panel {
+            width: 100%;
+            max-width: 350px;
+            background: #0d1117;
+            border: 1px solid #ff0055;
+            padding: 10px;
+            border-radius: 10px;
+            box-sizing: border-box;
+            font-size: 11px;
+            color: #ff3366;
+            max-height: 130px;
+            overflow-y: auto;
+            text-align: left;
         }
 
         .main-panel {
@@ -68,24 +83,24 @@
             max-width: 350px;
             background: #0d1117;
             border: 1px solid #1f293d;
-            padding: 12px;
+            padding: 10px;
             border-radius: 10px;
             box-sizing: border-box;
-            font-size: 12px;
+            font-size: 11px;
             color: #8b949e;
         }
 
         #floating-status {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
+            bottom: 10px;
+            right: 10px;
             background: #00ffcc;
             color: #000;
-            padding: 10px 15px;
-            border-radius: 30px;
+            padding: 8px 12px;
+            border-radius: 20px;
             font-weight: bold;
-            font-size: 12px;
-            box-shadow: 0 0 15px rgba(0, 255, 204, 0.6);
+            font-size: 11px;
+            box-shadow: 0 0 10px rgba(0, 255, 204, 0.6);
             z-index: 100;
         }
     </style>
@@ -98,21 +113,25 @@
             <div class="eye"></div>
             <div class="eye"></div>
         </div>
-        <h3 id="ai-name" style="margin: 0 0 5px 0; color: #fff;">চিঠি রোবট</h3>
-        <p id="robot-status">সিস্টেম প্রস্তুত। বলুন ওনার...</p>
+        <h3 id="ai-name" style="margin: 0 0 3px 0; color: #fff; font-size: 14px;">চিঠি রোবট</h3>
+        <p id="robot-status">সিস্টেম লোড হচ্ছে...</p>
     </div>
 
-    <!-- প্যানেল -->
+    <!-- রিয়েল-টাইম ডিবাগ কনসোল (কোথায় কোড প্রবলেম বা কী পড়ছে তা দেখার জন্য) -->
+    <div class="debug-panel" id="debug-log">
+        <strong>🛡️ ডিবাগ কনসোল (লাইভ মনিটর):</strong><br>
+        > সিস্টেম ইনিশিয়ালাইজড...
+    </div>
+
+    <!-- মেমোরি প্যানেল -->
     <div class="main-panel">
-        <p><strong>কথোপকথন মোড:</strong> <span style="color: #00ffcc;">পারমিশন ভিত্তিক আপডেট 🛡️</span></p>
-        <p><strong>সেভড মেমোরি ও রুলস:</strong></p>
-        <div id="rules-list" style="color: #00ffcc; max-height: 75px; overflow-y: auto;">কোনো ডেটা নেই।</div>
+        <p style="margin: 2px 0;"><strong>রুলস ও ডাটা:</strong> <span id="rules-list" style="color: #00ffcc;">কিছু নেই</span></p>
     </div>
 
     <!-- ফ্লোটিং স্ট্যাটাস -->
-    <div id="floating-status">🎙️ প্রস্তুত</div>
+    <div id="floating-status">🎙️ শুনছি...</div>
 
-    <!-- স্ক্রিপ্ট -->
+    <!-- স্ক্রিপ্ট লজিক -->
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-app.js";
         import { getDatabase, ref, set, onValue } from "https://www.gstatic.com/firebasejs/9.22.0/firebase-database.js";
@@ -135,12 +154,17 @@
         let robotMemory = { name: "চিঠি রোবট", rules: [] };
         let recognition = null;
         let isRobotSpeaking = false;
-        let pendingAction = null;
+
+        function logDebug(msg) {
+            const debugBox = document.getElementById('debug-log');
+            debugBox.innerHTML += `<br>> ${msg}`;
+            debugBox.scrollTop = debugBox.scrollHeight;
+        }
 
         window.onload = function() {
             loadFirebaseMemory();
             initSpeechRecognition();
-            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট। বলুন, আপনার সাথে কী নিয়ে আলোচনা করব?");
+            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট প্রস্তুত আছি। বলুন কী করতে হবে?");
         };
 
         function loadFirebaseMemory() {
@@ -154,7 +178,7 @@
                     }
                     if (data.rules) {
                         robotMemory.rules = data.rules;
-                        updateRulesUI();
+                        document.getElementById('rules-list').innerText = data.rules.join(', ');
                     }
                 }
             });
@@ -162,7 +186,10 @@
 
         function initSpeechRecognition() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) return;
+            if (!SpeechRecognition) {
+                logDebug("ব্রাউজারে SpeechRecognition সাপোর্ট করছে না!");
+                return;
+            }
 
             recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
@@ -176,12 +203,14 @@
             recognition.onresult = function(event) {
                 if (isRobotSpeaking) return;
                 let spokenText = event.results[0][0].transcript.trim();
-                if (spokenText.length > 1) {
+                logDebug(`ইউজার বলেছেন: "${spokenText}"`);
+                if (spokenText.length > 0) {
                     processWithGeminiAI(spokenText);
                 }
             };
 
-            recognition.onerror = function() {
+            recognition.onerror = function(event) {
+                logDebug(`মাইক এরর: ${event.error}`);
                 restartListening();
             };
 
@@ -203,18 +232,12 @@
 
         async function processWithGeminiAI(userInput) {
             try { recognition.stop(); } catch(e) {}
-            speakAndDisplay("ভাবছি...");
+            speakAndDisplay("চিহ্নিত করছি...");
 
             try {
-                let prompt = `তুমি একজন বুদ্ধিমান অটোনমাস এআই রোবট যার নাম "${robotMemory.name}"। ইউজারের কথা হলো: "${userInput}". 
-                তোমার কাজ হলো ইউজারের সাথে বাংলা ভাষায় স্বাধীনভাবে কথা বলা, যুক্তিতর্ক করা বা আলোচনা করা। 
-                যদি ইউজার কোনো কোড, নাম বা ডাটাবেজ আপডেট করার অনুরোধ করে, তবে সরাসরি সেভ কোরো না। সেটির একটি সংক্ষিপ্ত উত্তর বা প্রস্তাব তৈরি করো।
-                তুমি নিচের সাধারণ JSON ফরম্যাটে উত্তর দেবে (এর বাইরে কোনো অতিরিক্ত লেখা বা মার্কডাউন কোড ব্লক ব্যবহার করবে না):
-                {
-                  "replyMessage": "রোবটের মুখে বলার মতো চমৎকার সাবলীল বাংলা উত্তর বা পরামর্শ",
-                  "needsPermission": true,
-                  "extractedData": "${userInput}"
-                }`;
+                // সরাসরি জেমিনি থেকে প্লেইন টেক্সট উত্তর নেওয়ার ব্যবস্থা করা হলো যাতে JSON ভাঙার কোনো ঝামেলা না থাকে
+                let prompt = `তুমি একজন অটোনমাস রোবট যার নাম "${robotModelName()}". ইউজার বাংলায় একটি কথা বলেছেন: "${userInput}". 
+                তুমি একদম সাবলীল বাংলায় ইউজারের কথার উত্তর দাও বা তার সাথে আলোচনা করো। যদি ইউজার কোনো রুলস বা নাম পরিবর্তন করতে বলে, তবে তোমার উত্তরে পরিষ্কার জানিয়ে দাও যে তুমি সেটি ফায়ারবেসে সেভ করতে প্রস্তুত কি না।`;
 
                 let response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_API_KEY}`, {
                     method: 'POST',
@@ -223,65 +246,28 @@
                 });
 
                 let result = await response.json();
-                let textResponse = result.candidates[0].content.parts[0].text;
+                let aiReply = result.candidates[0].content.parts[0].text;
                 
-                // ক্লিন কোড ও জেসন এক্সট্রাক্ট করার নিরাপদ পদ্ধতি
-                let cleanJsonStr = textResponse.replace(/```json/g, '').replace(/```/g, '').trim();
-                let jsonStart = cleanJsonStr.indexOf('{');
-                let jsonEnd = cleanJsonStr.lastIndexOf('}') + 1;
-                let aiData = JSON.parse(cleanJsonStr.substring(jsonStart, jsonEnd));
+                logDebug(`জেমিনি রেসপন্স সফল.`);
+                speakAndDisplay(aiReply);
 
-                handleAiLogic(aiData, userInput);
+                // যদি ইউজার নির্দিষ্ট করে বলে নাম বা রুলস রাখতে
+                if (userInput.includes("নাম") || userInput.includes("রোবট")) {
+                    let newName = userInput.replace("নাম", "").replace("পরিবর্তন", "").trim();
+                    if(newName.length > 2) {
+                        set(ref(db, 'chitti_ai_core/name'), newName);
+                        logDebug(`ডাটাবেজ আপডেট: নাম = ${newName}`);
+                    }
+                }
 
             } catch (error) {
-                // জেমিনি থেকে সরাসরি সাধারণ টেক্সট উত্তর নেওয়ার ফলব্যাক পদ্ধতি
-                speakAndDisplay(userInput + " এ বিষয়ে আপনার সাথে বিস্তারিত আলোচনা করছি ওনার। বলুন কী করতে হবে?");
+                logDebug(`ত্রুটি ধরা পড়েছে: ${error.message}`);
+                speakAndDisplay("আপনার কথা বুঝতে পেরেছি ওনার। বলুন, আর কী নির্দেশ আছে?");
             }
         }
 
-        function handleAiLogic(data, rawInput) {
-            let reply = data.replyMessage || "বুঝেছি ওনার।";
-            let isApproving = rawInput.includes("হ্যাঁ") || rawInput.includes("করো") || rawInput.includes("ঠিক আছে") || rawInput.includes("দাও");
-
-            if (pendingAction && isApproving) {
-                executeDatabaseUpdate(pendingAction.extractedData);
-                pendingAction = null;
-                return;
-            }
-
-            if (data.needsPermission) {
-                pendingAction = data;
-                speakAndDisplay(reply + " এটি কি ফায়ারবেসে লাইভ করে দেব, ওনার?");
-            } else {
-                speakAndDisplay(reply);
-            }
-        }
-
-        function executeDatabaseUpdate(dataContent) {
-            speakAndDisplay("আপনার অনুমতি পেয়েছি। ফায়ারবেসে লাইভ আপডেট করা হচ্ছে...");
-            
-            if (dataContent.length < 25 && !dataContent.includes("কোড")) {
-                robotMemory.name = dataContent;
-                set(ref(db, 'chitti_ai_core/name'), robotMemory.name);
-                document.getElementById('ai-name').innerText = robotMemory.name;
-            } else {
-                robotMemory.rules.push(dataContent);
-                set(ref(db, 'chitti_ai_core/rules'), robotMemory.rules);
-                updateRulesUI();
-            }
-
-            setTimeout(() => {
-                speakAndDisplay("সফলভাবে ফায়ারবেসে লাইভ আপডেট করা হয়েছে ওনার!");
-            }, 1000);
-        }
-
-        function updateRulesUI() {
-            let container = document.getElementById('rules-list');
-            if (robotMemory.rules.length > 0) {
-                container.innerHTML = robotMemory.rules.map((r, i) => `<div>${i + 1}. ${r}</div>`).join('');
-            } else {
-                container.innerHTML = "কোনো ডেটা নেই।";
-            }
+        function robotModelName() {
+            return robotMemory.name;
         }
 
         function speakAndDisplay(text) {
