@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Chitti Robot - Groq AI Integration</title>
+    <title>Autonomous Chitti Robot - Fixed System</title>
     <style>
         body {
             background-color: #050505;
@@ -114,17 +114,17 @@
             <div class="eye"></div>
         </div>
         <h3 id="ai-name" style="margin: 0 0 2px 0; color: #fff; font-size: 13px;">চিঠি রোবট</h3>
-        <p id="robot-status">ডাটাবেজ থেকে সিকিউর লোডিং...</p>
+        <p id="robot-status">কানেক্ট করা হচ্ছে...</p>
     </div>
 
     <div class="debug-panel" id="debug-log">
-        <strong>🛡️ এআই সুপার-ফাস্ট কনসোল:</strong><br>
-        > সিস্টেম লোড হচ্ছে...
+        <strong>🛡️ রোবট সিস্টেম কনসোল:</strong><br>
+        > সিস্টেম স্টার্ট হচ্ছে...
     </div>
 
     <div class="control-panel">
         <input type="text" id="user-input" placeholder="এখানে কমান্ড লিখুন..." autocomplete="off">
-        <button onclick="sendManualCommand()">পাঠান</button>
+        <button id="send-btn">পাঠান</button>
     </div>
 
     <script type="module">
@@ -146,7 +146,7 @@
         const db = getDatabase(app);
         
         let robotMemory = { name: "চিঠি রোবট" };
-        let dynamicApiKey = "";
+        let dynamicApiKey = ""; // ফায়ারবেস থেকে লোড হবে
 
         function logDebug(msg) {
             const debugBox = document.getElementById('debug-log');
@@ -154,33 +154,36 @@
             debugBox.scrollTop = debugBox.scrollHeight;
         }
 
-        window.onload = function() {
-            loadFirebaseConfigs();
-            speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, প্রস্তুত আছি।");
-        };
-
-        function loadFirebaseConfigs() {
-            onValue(ref(db, 'chitti_ai_core/'), (snapshot) => {
-                let data = snapshot.val();
-                if (data) {
-                    if (data.name) {
-                        robotMemory.name = data.name;
-                        document.getElementById('ai-name').innerText = data.name;
-                    }
-                    if (data.gemini_key) {
-                        dynamicApiKey = data.gemini_key;
-                        logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
-                    }
+        // ফায়ারবেস কনফিগারেশন লোড করা
+        onValue(ref(db, 'chitti_ai_core/'), (snapshot) => {
+            let data = snapshot.val();
+            if (data) {
+                if (data.name) {
+                    robotMemory.name = data.name;
+                    document.getElementById('ai-name').innerText = data.name;
                 }
-            });
-        }
+                if (data.gemini_key) {
+                    dynamicApiKey = data.gemini_key;
+                    logDebug("ফায়ারবেস থেকে এপিআই কি সফলভাবে পাওয়া গেছে।");
+                    speakAndDisplay(`হ্যালো ওনার! আমি ${robotMemory.name}, প্রস্তুত আছি।`);
+                }
+            } else {
+                logDebug("ওয়ার্নিং: ডাটাবেজে কোনো ডাটা পাওয়া যায়নি।");
+            }
+        });
 
-        window.sendManualCommand = function() {
+        // ইভেন্ট লিসেনার (HTML onclick ঝামেলার বদলে সরাসরি JavaScript হ্যান্ডলার)
+        document.getElementById('send-btn').addEventListener('click', sendManualCommand);
+        document.getElementById('user-input').addEventListener('keypress', function (e) {
+            if (e.key === 'Enter') sendManualCommand();
+        });
+
+        function sendManualCommand() {
             let inputField = document.getElementById('user-input');
             let text = inputField.value.trim();
             if (text.length > 0) {
                 if (!dynamicApiKey) {
-                    logDebug("ত্রুটি: এপিআই কি পাওয়া যায়নি।");
+                    logDebug("ত্রুটি: এপিআই কি পাওয়া যায়নি। ফায়ারবেস চেক করুন।");
                     speakAndDisplay("এপিআই কি সেট করা হয়নি।");
                     return;
                 }
@@ -188,9 +191,8 @@
                 inputField.value = "";
                 processWithGroq(text);
             }
-        };
+        }
 
-        // Groq API - একদম ফ্রি এবং সরাসরি ব্রাউজার থেকে কাজ করে
         async function processWithGroq(userInput) {
             speakAndDisplay("ভাবছি...");
             logDebug(`Groq এআই সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
@@ -207,7 +209,7 @@
                         messages: [
                             {
                                 role: "system",
-                                content: `তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি সবসময় নিজেকে "${robotMemory.name}" হিসেবে পরিচয় দেবে এবং বাংলা ভাষায় সংক্ষিপ্ত ও সুন্দর উত্তর দেবে।`
+                                content: `তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি সবসময় বাংলা ভাষায় সংক্ষেপে ও সুন্দর উত্তর দেবে।`
                             },
                             {
                                 role: "user",
@@ -227,7 +229,7 @@
 
             } catch (error) {
                 logDebug(`ত্রুটি: ${error.message}`);
-                speakAndDisplay(`আমি ${robotMemory.name}, আপনার কথা শুনতে পাচ্ছি!`);
+                speakAndDisplay(`আমি ${robotMemory.name}, কোনো সমস্যা হয়েছে!`);
             }
         }
 
