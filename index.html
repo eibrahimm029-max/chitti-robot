@@ -3,28 +3,117 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি রোবট</title>
+    <title>চিঠি রোবট - অটোমেশন এআই</title>
     <style>
-        body { background: #050505; color: #00ffcc; font-family: monospace; text-align: center; padding: 20px; }
-        .box { border: 2px solid #00ffcc; padding: 20px; border-radius: 10px; max-width: 400px; margin: auto; box-shadow: 0 0 15px #00ffcc; }
-        input { background: #000; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; width: 60%; border-radius: 5px; outline: none; }
-        button { background: #00ffcc; color: #000; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 5px; }
-        #reply { margin-top: 20px; min-height: 50px; font-size: 16px; word-wrap: break-word; line-height: 1.5; }
+        body { 
+            background: #080810; 
+            color: #00ffcc; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            text-align: center; 
+            padding: 20px; 
+        }
+        .box { 
+            border: 2px solid #00ffcc; 
+            padding: 25px; 
+            border-radius: 15px; 
+            max-width: 450px; 
+            margin: auto; 
+            box-shadow: 0 0 20px #00ffcc; 
+            background: #10101a; 
+        }
+        h2 { margin-bottom: 10px; }
+        input { 
+            background: #000; 
+            border: 1px solid #00ffcc; 
+            color: #00ffcc; 
+            padding: 12px; 
+            width: 55%; 
+            border-radius: 8px; 
+            outline: none; 
+            font-size: 15px; 
+        }
+        button { 
+            background: #00ffcc; 
+            color: #000; 
+            border: none; 
+            padding: 12px 15px; 
+            font-weight: bold; 
+            cursor: pointer; 
+            border-radius: 8px; 
+            font-size: 15px; 
+        }
+        .mic-btn { 
+            background: #ff0055; 
+            color: white; 
+            border-radius: 50%; 
+            width: 48px; 
+            height: 48px; 
+            border: none; 
+            margin-left: 5px; 
+            cursor: pointer; 
+            font-size: 20px; 
+        }
+        #reply { 
+            margin-top: 20px; 
+            min-height: 60px; 
+            font-size: 17px; 
+            word-wrap: break-word; 
+            line-height: 1.5; 
+            color: #ffffff; 
+            background: #00000055;
+            padding: 10px;
+            border-radius: 8px;
+        }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2>🤖 চিঠি রোবট</h2>
-        <div id="reply">সার্ভার প্রস্তুত! কিছু লিখুন...</div>
+        <h2>🤖 চিঠি অটোমেটেড রোবট</h2>
+        <div id="reply">আমি প্রস্তুত! কথা বলতে মাইক্রোফোনে চাপ দিন অথবা বার্তা লিখুন।</div>
         <br>
-        <input type="text" id="userInput" placeholder="বার্তা লিখুন...">
-        <button onclick="send()">পাঠান</button>
+        <div style="display:flex; justify-content:center; align-items:center; gap: 5px;">
+            <input type="text" id="userInput" placeholder="কথা বলুন বা লিখুন...">
+            <button onclick="sendMsg()">পাঠান</button>
+            <button class="mic-btn" onclick="startVoice()" title="ভয়েস ইনপুট">🎤</button>
+        </div>
     </div>
 
     <script>
         const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
+        let conversationHistory = [];
 
-        async function send() {
+        // ভয়েস ইনপুট শুরু করা (Speech Recognition)
+        function startVoice() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) {
+                alert("আপনার ব্রাউজার ভয়েস সাপোর্ট করে না। Google Chrome ব্যবহার করুন।");
+                return;
+            }
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'bn-BD'; // বাংলা ভাষা
+            recognition.start();
+
+            document.getElementById('reply').innerText = "শুনছি, বলুন...";
+
+            recognition.onresult = function(event) {
+                let text = event.results[0][0].transcript;
+                document.getElementById('userInput').value = text;
+                sendMsg();
+            };
+        }
+
+        // এআই উত্তর মুখে উচ্চারণ করা (Text to Speech)
+        function speakText(text) {
+            if ('speechSynthesis' in window) {
+                window.speechSynthesis.cancel();
+                let utterance = new SpeechSynthesisUtterance(text);
+                utterance.lang = 'bn-BD';
+                window.speechSynthesis.speak(utterance);
+            }
+        }
+
+        // মেসেজ পাঠানো ও প্রসেস করা
+        async function sendMsg() {
             let input = document.getElementById('userInput');
             let replyDiv = document.getElementById('reply');
             let msg = input.value.trim();
@@ -37,12 +126,22 @@
                 let res = await fetch(SERVER_URL, {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({message: msg})
+                    body: JSON.stringify({
+                        message: msg,
+                        history: conversationHistory
+                    })
                 });
+
                 let data = await res.json();
                 replyDiv.innerText = data.reply;
+                speakText(data.reply); // স্পিকারে উত্তর দেবে
+
+                // কথোপকথন মেমোরিতে সংরক্ষণ
+                conversationHistory.push({"role": "user", "content": msg});
+                conversationHistory.push({"role": "assistant", "content": data.reply});
+
             } catch (err) {
-                replyDiv.innerText = "সার্ভারের সাথে কানেক্ট করা যাচ্ছে না!";
+                replyDiv.innerText = "সার্ভারের সাথে সংযোগ বিচ্ছিন্ন হয়েছে!";
             }
         }
     </script>
