@@ -6,16 +6,8 @@ import requests
 app = Flask(__name__)
 CORS(app)
 
-# Render Environment Variable থেকে API Key নেওয়া হচ্ছে
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
-
-# OpenRouter-এর শতভাগ ফ্রি ও দ্রুত কাজ করা মডেলসমূহ
-AI_MODELS = [
-    "meta-llama/llama-3.3-70b-instruct:free",
-    "google/gemini-2.0-flash-exp:free",
-    "deepseek/deepseek-r1:free",
-    "qwen/qwen-2.5-72b-instruct:free"
-]
+# Render Environment Variable থেকে Groq API Key লোড করা হচ্ছে
+GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
 @app.route('/', methods=['GET'])
 def home():
@@ -29,36 +21,33 @@ def chat():
     if not msg:
         return jsonify({"reply": "অনুগ্রহ করে কোনো বার্তা লিখুন।"})
 
-    if not OPENROUTER_API_KEY:
-        return jsonify({"reply": "Render-এ OPENROUTER_API_KEY সেট করা হয়নি!"})
+    if not GROQ_KEY:
+        return jsonify({"reply": "Render-এ GROQ_API_KEY সেট করা হয়নি!"})
 
     headers = {
-        "Authorization": f"Bearer {OPENROUTER_API_KEY}",
+        "Authorization": f"Bearer {GROQ_KEY}",
         "Content-Type": "application/json"
     }
 
-    system_instruction = "আপনি 'চিঠি রোবট'। ব্যবহারকারীর প্রশ্নের স্পষ্ট ও সুন্দর উত্তর দিন।"
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": "আপনি 'চিঠি রোবট'। ব্যবহারকারী যেকোনো ভাষায় প্রশ্ন করুক না কেন, উত্তর সবসময় স্পষ্ট ও সুন্দর বাংলায় দিন।"},
+            {"role": "user", "content": msg}
+        ]
+    }
 
-    for model in AI_MODELS:
-        try:
-            payload = {
-                "model": model,
-                "messages": [
-                    {"role": "system", "content": system_instruction},
-                    {"role": "user", "content": msg}
-                ]
-            }
-            res = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=12)
-            
-            if res.status_code == 200:
-                result = res.json()
-                reply_text = result['choices'][0]['message']['content']
-                if reply_text:
-                    return jsonify({"reply": reply_text})
-        except Exception:
-            continue
-
-    return jsonify({"reply": "দুঃখিত, কোনো এআই সার্ভার রেসপন্স করছে না।"})
+    try:
+        res = requests.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers, timeout=10)
+        
+        if res.status_code == 200:
+            result = res.json()
+            reply_text = result['choices'][0]['message']['content']
+            return jsonify({"reply": reply_text})
+        else:
+            return jsonify({"reply": f"Groq Error: {res.status_code}"})
+    except Exception as e:
+        return jsonify({"reply": "সার্ভার রেসপন্স করতে সমস্যা হচ্ছে, আবার চেষ্টা করুন।"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
