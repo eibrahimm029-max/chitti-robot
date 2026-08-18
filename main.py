@@ -33,7 +33,7 @@ def chat():
                 "Content-Type": "application/json"
             },
             json={
-                "model": "google/gemini-2.0-flash-lite-001",
+                "model": "google/gemini-2.5-flash-lite",
                 "messages": [
                     {"role": "system", "content": "আপনি 'চিঠি রোবট'। সবসময় সহজ ও সুন্দর বাংলায় উত্তর দিন।"},
                     {"role": "user", "content": msg}
@@ -54,3 +54,4 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+    
