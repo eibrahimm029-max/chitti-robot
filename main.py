@@ -8,9 +8,12 @@ CORS(app)
 
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
+# Groq-এর ১০০% ফ্রি ও সক্রিয় মডেল
+MODEL_NAME = "llama-3.1-8b-instant"
+
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti Robot Active"})
+    return jsonify({"status": "Chitti Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -27,7 +30,7 @@ def chat():
         client = Groq(api_key=GROQ_KEY)
         
         completion = client.chat.completions.create(
-            model="llama-3.1-8b-instant",
+            model=MODEL_NAME,
             messages=[
                 {"role": "system", "content": "আপনি 'চিঠি রোবট'। ব্যবহারকারীর প্রশ্নের উত্তর সবসময় স্পষ্ট ও সুন্দর বাংলায় দিন।"},
                 {"role": "user", "content": msg}
