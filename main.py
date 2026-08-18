@@ -8,16 +8,9 @@ CORS(app)
 
 GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 
-# Groq-এর অ্যাক্টিভ ও ফ্রি মডেলসমূহ
-MODELS = [
-    "llama-3.3-70b-versatile",
-    "llama-3.1-8b-instant",
-    "llama3-70b-8192"
-]
-
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti Active"})
+    return jsonify({"status": "Chitti Robot Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -33,25 +26,18 @@ def chat():
     try:
         client = Groq(api_key=GROQ_KEY)
         
-        # ব্যাকআপ সহ মডেল কল
-        for model_name in MODELS:
-            try:
-                completion = client.chat.completions.create(
-                    model=model_name,
-                    messages=[
-                        {"role": "system", "content": "আপনি 'চিঠি রোবট'। ব্যবহারকারীর প্রশ্নের উত্তর সবসময় স্পষ্ট ও সুন্দর বাংলায় দিন।"},
-                        {"role": "user", "content": msg}
-                    ],
-                    temperature=0.7,
-                    max_tokens=1024
-                )
-                reply = completion.choices[0].message.content
-                if reply:
-                    return jsonify({"reply": reply})
-            except Exception:
-                continue
-
-        return jsonify({"reply": "কোনো মডেল রেসপন্স করছে না।"})
+        completion = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": "আপনি 'চিঠি রোবট'। ব্যবহারকারীর প্রশ্নের উত্তর সবসময় স্পষ্ট ও সুন্দর বাংলায় দিন।"},
+                {"role": "user", "content": msg}
+            ],
+            temperature=0.7,
+            max_tokens=1024
+        )
+        
+        reply = completion.choices[0].message.content
+        return jsonify({"reply": reply})
 
     except Exception as e:
         return jsonify({"reply": f"Groq Error: {str(e)}"})
