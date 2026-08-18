@@ -7,13 +7,14 @@ app = Flask(__name__)
 CORS(app)
 
 # Render Environment Variable থেকে API Key নেওয়া হচ্ছে
-OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 
-# একাধিক ফ্রি এআই মডেলের লিস্ট
+# OpenRouter-এর শতভাগ ফ্রি ও দ্রুত কাজ করা মডেলসমূহ
 AI_MODELS = [
-    "google/gemini-2.0-flash-001",
     "meta-llama/llama-3.3-70b-instruct:free",
-    "mistralai/mistral-small-24b-instruct:free"
+    "google/gemini-2.0-flash-exp:free",
+    "deepseek/deepseek-r1:free",
+    "qwen/qwen-2.5-72b-instruct:free"
 ]
 
 @app.route('/', methods=['GET'])
@@ -36,7 +37,7 @@ def chat():
         "Content-Type": "application/json"
     }
 
-    system_instruction = "আপনি 'চিঠি রোবট'। ব্যবহারকারী যেকোনো ভাষায় প্রশ্ন করুক না কেন, উত্তর সবসময় স্পষ্ট ও সুন্দর বাংলায় দিন।"
+    system_instruction = "আপনি 'চিঠি রোবট'। ব্যবহারকারীর প্রশ্নের স্পষ্ট ও সুন্দর উত্তর দিন।"
 
     for model in AI_MODELS:
         try:
@@ -47,12 +48,13 @@ def chat():
                     {"role": "user", "content": msg}
                 ]
             }
-            res = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=15)
+            res = requests.post("https://openrouter.ai/api/v1/chat/completions", json=payload, headers=headers, timeout=12)
             
             if res.status_code == 200:
                 result = res.json()
                 reply_text = result['choices'][0]['message']['content']
-                return jsonify({"reply": reply_text})
+                if reply_text:
+                    return jsonify({"reply": reply_text})
         except Exception:
             continue
 
@@ -60,4 +62,3 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-    
