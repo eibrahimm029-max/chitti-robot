@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Autonomous Chitti Robot - Universal AI Remote</title>
+    <title>Autonomous Chitti Robot - Groq AI Integration</title>
     <style>
         body {
             background-color: #050505;
@@ -118,7 +118,7 @@
     </div>
 
     <div class="debug-panel" id="debug-log">
-        <strong>🛡️ ইউনিভার্সাল রিমোট কনসোল:</strong><br>
+        <strong>🛡️ এআই সুপার-ফাস্ট কনসোল:</strong><br>
         > সিস্টেম লোড হচ্ছে...
     </div>
 
@@ -159,26 +159,17 @@
             speakAndDisplay("হ্যালো ওনার! আমি চিঠি রোবট, প্রস্তুত আছি।");
         };
 
-        // ফায়ারবেসের যেকোনো পাথ থেকে কনফিগ ও কি রিড করার স্মার্ট লজিক
         function loadFirebaseConfigs() {
-            onValue(ref(db, '/'), (snapshot) => {
+            onValue(ref(db, 'chitti_ai_core/'), (snapshot) => {
                 let data = snapshot.val();
                 if (data) {
-                    // যদি রুট লেভেলে gemini_key থাকে
+                    if (data.name) {
+                        robotMemory.name = data.name;
+                        document.getElementById('ai-name').innerText = data.name;
+                    }
                     if (data.gemini_key) {
                         dynamicApiKey = data.gemini_key;
                         logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
-                    }
-                    // যদি chitti_ai_core এর ভেতরে থাকে
-                    if (data.chitti_ai_core) {
-                        if (data.chitti_ai_core.name) {
-                            robotMemory.name = data.chitti_ai_core.name;
-                            document.getElementById('ai-name').innerText = data.chitti_ai_core.name;
-                        }
-                        if (data.chitti_ai_core.gemini_key) {
-                            dynamicApiKey = data.chitti_ai_core.gemini_key;
-                            logDebug("রিমোট এপিআই কি সফলভাবে লোড হয়েছে।");
-                        }
                     }
                 }
             });
@@ -195,85 +186,45 @@
                 }
                 logDebug(`কমান্ড পাঠানো হলো: "${text}"`);
                 inputField.value = "";
-                
-                // কি দেখে স্বয়ংক্রিয়ভাবে জেমিনি অথবা হাগিং ফেস নির্ধারণ করবে
-                if (dynamicApiKey.startsWith("AIza")) {
-                    processWithGemini(text);
-                } else {
-                    processWithHuggingFace(text);
-                }
+                processWithGroq(text);
             }
         };
 
-        // যদি জেমিনি কি (AIza...) দেন তবে এটি কাজ করবে
-        async function processWithGemini(userInput) {
+        // Groq API - একদম ফ্রি এবং সরাসরি ব্রাউজার থেকে কাজ করে
+        async function processWithGroq(userInput) {
             speakAndDisplay("ভাবছি...");
-            logDebug(`জেমিনি সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
+            logDebug(`Groq এআই সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
 
             try {
-                const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${dynamicApiKey.trim()}`;
-                const response = await fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text: `তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি সবসময় নিজেকে "${robotMemory.name}" হিসেবে পরিচয় দেবে এবং বাংলায় সাবলীল ও সংক্ষিপ্ত উত্তর দেবে। ব্যবহারকারীর কথা: ${userInput}`
-                            }]
-                        }]
-                    })
-                });
-
-                let result = await response.json();
-                if (!response.ok) throw new Error(result.error?.message || `HTTP Error: ${response.status}`);
-
-                let aiReply = "আমি বুঝতে পেরেছি!";
-                if (result.candidates?.[0]?.content?.parts?.[0]?.text) {
-                    aiReply = result.candidates[0].content.parts[0].text.trim();
-                }
-
-                logDebug(`সফল রেসপন্স প্রাপ্ত!`);
-                speakAndDisplay(aiReply);
-            } catch (error) {
-                logDebug(`ত্রুটি: ${error.message}`);
-                speakAndDisplay(`আমি ${robotMemory.name}, আপনার কথা শুনতে পাচ্ছি!`);
-            }
-        }
-
-        // যদি হাগিং ফেস টোকেন (hf_...) দেন তবে এটি কাজ করবে
-        async function processWithHuggingFace(userInput) {
-            speakAndDisplay("ভাবছি...");
-            logDebug(`এআই সার্ভারে রিকোয়েস্ট পাঠানো হচ্ছে...`);
-
-            try {
-                const targetUrl = "https://api-inference.huggingface.co/models/mistralai/Mistral-7B-Instruct-v0.2";
-                const proxyUrl = "https://corsproxy.io/?";
-
-                const response = await fetch(proxyUrl + encodeURIComponent(targetUrl), {
+                const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                     method: "POST",
                     headers: {
                         "Authorization": `Bearer ${dynamicApiKey.trim()}`,
                         "Content-Type": "application/json"
                     },
                     body: JSON.stringify({
-                        inputs: `[INST] তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি বাংলায় সংক্ষিপ্ত উত্তর দেবে। ব্যবহারকারীর কথা: ${userInput} [/INST]`
+                        model: "llama-3.3-70b-versatile",
+                        messages: [
+                            {
+                                role: "system",
+                                content: `তুমি একজন অটোনমাস রোবট। তোমার নাম "${robotMemory.name}"। তুমি সবসময় নিজেকে "${robotMemory.name}" হিসেবে পরিচয় দেবে এবং বাংলা ভাষায় সংক্ষিপ্ত ও সুন্দর উত্তর দেবে।`
+                            },
+                            {
+                                role: "user",
+                                content: userInput
+                            }
+                        ]
                     })
                 });
 
                 let result = await response.json();
-                if (!response.ok) throw new Error(result.error || `HTTP Error: ${response.status}`);
+                if (!response.ok) throw new Error(result.error?.message || `HTTP Error: ${response.status}`);
 
-                let aiReply = "";
-                if (Array.isArray(result) && result[0].generated_text) {
-                    aiReply = result[0].generated_text.split("[/INST]").pop().trim();
-                } else if (result.generated_text) {
-                    aiReply = result.generated_text.split("[/INST]").pop().trim();
-                } else {
-                    aiReply = "আমি বুঝতে পেরেছি!";
-                }
+                let aiReply = result.choices[0]?.message?.content || "আমি বুঝতে পেরেছি!";
 
                 logDebug(`সফল রেসপন্স প্রাপ্ত!`);
                 speakAndDisplay(aiReply);
+
             } catch (error) {
                 logDebug(`ত্রুটি: ${error.message}`);
                 speakAndDisplay(`আমি ${robotMemory.name}, আপনার কথা শুনতে পাচ্ছি!`);
