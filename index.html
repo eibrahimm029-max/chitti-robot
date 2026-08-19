@@ -3,7 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি রোবট - অটোমেশন এআই</title>
+    <title id="pageTitle">চিঠি রোবট - অটোমেশন এআই</title>
+    
+    <!-- Firebase JS SDK (v8 Compat) -->
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
+
     <style>
         body { 
             background: #080810; 
@@ -11,6 +16,7 @@
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             text-align: center; 
             padding: 20px; 
+            transition: all 0.5s ease;
         }
         .box { 
             border: 2px solid #00ffcc; 
@@ -20,6 +26,7 @@
             margin: auto; 
             box-shadow: 0 0 20px #00ffcc; 
             background: #10101a; 
+            transition: all 0.5s ease;
         }
         h2 { margin-bottom: 10px; }
         input { 
@@ -41,6 +48,7 @@
             cursor: pointer; 
             border-radius: 8px; 
             font-size: 15px; 
+            transition: all 0.3s ease;
         }
         .mic-btn { 
             background: #ff0055; 
@@ -67,18 +75,59 @@
     </style>
 </head>
 <body>
-    <div class="box">
-        <h2>🤖 চিঠি অটোমেটেড রোবট</h2>
+    <div class="box" id="mainBox">
+        <h2 id="appHeader">🤖 চিঠি অটোমেটেড রোবট</h2>
         <div id="reply">আমি প্রস্তুত! কথা বলতে মাইক্রোফোনে চাপ দিন অথবা বার্তা লিখুন।</div>
         <br>
-        <div style="display:flex; justify-content:center; align-items:center; gap: 5px;">
+        <div id="controlsContainer" style="display:flex; justify-content:center; align-items:center; gap: 5px;">
             <input type="text" id="userInput" placeholder="কথা বলুন বা লিখুন...">
-            <button onclick="sendMsg()">পাঠান</button>
-            <button class="mic-btn" onclick="startVoice()" title="ভয়েস ইনপুট">🎤</button>
+            <button id="sendBtn" onclick="sendMsg()">পাঠান</button>
+            <button id="micBtn" class="mic-btn" onclick="startVoice()" title="ভয়েস ইনপুট">🎤</button>
         </div>
     </div>
 
     <script>
+        // ==========================================
+        // ১. ফায়ারবেস কনফিগারেশন ও ডাইনামিক UI লিসেনার
+        // ==========================================
+        // Render এ যেই FIREBASE_DB_URL ব্যবহার করছেন সেটি নিচে 'YOUR_FIREBASE_DATABASE_URL' এর জায়গায় বসাবেন
+        const firebaseConfig = {
+            databaseURL: "https://YOUR_FIREBASE_DATABASE_URL.firebaseio.com"
+        };
+
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        // ফায়ারবেসের ui_config নোড রিয়েলটাইমে মনিটর করা
+        const uiRef = firebase.database().ref('ui_config');
+        uiRef.on('value', function(snapshot) {
+            const config = snapshot.val();
+            if (config) {
+                // ১. ব্যাকগ্রাউন্ড কালার পরিবর্তন
+                if (config.bg_color) {
+                    document.body.style.backgroundColor = config.bg_color;
+                }
+                
+                // ২. অ্যাপের শিরোনাম/টাইটেল পরিবর্তন
+                if (config.app_title) {
+                    document.getElementById('appHeader').innerText = "🤖 " + config.app_title;
+                    document.getElementById('pageTitle').innerText = config.app_title;
+                }
+                
+                // ৩. ইনপুট ও বাটনসমূহ হাইড/শো করা
+                if (config.show_buttons !== undefined) {
+                    const controls = document.getElementById('controlsContainer');
+                    if (controls) {
+                        controls.style.display = config.show_buttons ? 'flex' : 'none';
+                    }
+                }
+            }
+        });
+
+        // ==========================================
+        // ২. চ্যাট ও ভয়েস লজিক
+        // ==========================================
         const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
         let conversationHistory = [];
 
