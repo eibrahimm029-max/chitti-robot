@@ -3,7 +3,6 @@ from flask_cors import CORS
 import os
 import requests
 import json
-import base64
 import firebase_admin
 from firebase_admin import credentials, db
 
@@ -14,11 +13,6 @@ OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
 FIREBASE_CREDS = os.environ.get("FIREBASE_CREDENTIALS_JSON", "").strip()
 
-GITHUB_TOKEN = os.environ.get("GITHUB_TOKEN", "").strip()
-GITHUB_REPO = os.environ.get("GITHUB_REPO", "chitti-robot").strip()
-GITHUB_USERNAME = os.environ.get("GITHUB_USERNAME", "eibrahimm029-max").strip()
-
-# Firebase Initialisation
 if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     try:
         cred_dict = json.loads(FIREBASE_CREDS)
@@ -30,11 +24,7 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
 
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({
-        "status": "Chitti Robot Dynamic Control & AI Brain Active",
-        "firebase_connected": bool(firebase_admin._apps),
-        "github_auto_coder": bool(GITHUB_TOKEN)
-    })
+    return jsonify({"status": "Chitti Dynamic Self-Building AI Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -46,30 +36,23 @@ def chat():
         return jsonify({"reply": "অনুগ্রহ করে কোনো নির্দেশ দিন।"})
 
     if not OPENROUTER_KEY:
-        return jsonify({"reply": "Render-এ OPENROUTER_API_KEY সেট করা নেই!"})
+        return jsonify({"reply": "OpenRouter API Key পাওয়া যায়নি!"})
 
-    robot_memory = {}
-    if firebase_admin._apps:
-        try:
-            robot_memory = db.reference('/').get() or {}
-        except Exception as e:
-            robot_memory = {"error": str(e)}
+    system_prompt = """
+    আপনি 'চিঠি রোবট'—একটি সম্পূর্ণ ডায়নামিক ও স্বয়ংক্রিয় এআই সিস্টেম। 
+    ইউজার যদি অ্যাপে কোনো নতুন ফিচার, নতুন বাটন, ফাইল আপলোড, স্লাইডার, ক্যামেরা বা যেকোনো এলিমেন্ট যুক্ত করতে বলে, তবে আপনি আপনার উত্তরের শেষে একটি JSON কোড ব্লক যুক্ত করবেন যা দিয়ে স্ক্রিনে নতুন HTML বা লজিক রেন্ডার হবে।
 
-    system_prompt = f"""
-    আপনি 'চিঠি রোবট'—একটি স্বয়ংক্রিয় বুদ্ধিমান এআই এবং ওনারের নির্দেশ পালনকারী সহকারী। 
-    আপনার বর্তমান ডাটাবেজ মেমোরি:
-    {json.dumps(robot_memory, ensure_ascii=False)}
-
-    আপনার একটি বিশেষ ক্ষমতা রয়েছে:
-    ওনার (ইউজার) যদি অ্যাপের কোনো ডিজাইন, বাটন অন/অফ, কালার, টাইটেল বা লজিক পরিবর্তন করার কথা বলে, তবে আপনি আপনার উত্তরের শেষে একটি JSON আপডেট ব্লক যুক্ত করবেন।
-    
-    JSON ফরম্যাটটি অবশ্যই এইরকম হতে হবে:
-    [[UI_UPDATE: {{"bg_color": "red", "show_camera": false, "app_title": "নতুন নাম", "night_mode": true}}]]
+    JSON ফরম্যাটটি অবশ্যই এই রকম হতে হবে:
+    [[UI_UPDATE: {
+        "bg_color": "red",
+        "app_title": "নতুন নাম",
+        "custom_html": "<button class='dynamic-btn' onclick='alert(\\\"হ্যালো\\\")'>নতুন ফিচার</button>",
+        "custom_js": "console.log('Custom Logic Active');"
+    }]]
 
     কথা বলার নিয়মাবলী:
-    ১. একদম সহজ, সুন্দর, প্রাঞ্জল ও মানুষের মতো প্রমিত বাংলায় উত্তর দিন। 
-    ২. বাংলা উত্তরের অংশে কোনো প্রকার স্টার (*), হ্যাশ (#) বা কোনো প্রকার স্যাম্বল বা কোডিং চিহ্ন রাখবেন না, কারণ এগুলো স্পিকারে পড়া হবে।
-    ৩. আপনি নিজেই ফায়ারবেস এবং গিটহাব কন্ট্রোল করতে সক্ষম।
+    ১. একদম সহজ, প্রমিত বাংলায় কথা বলুন।
+    ২. বাংলা উত্তরের অংশে কোনো স্টার (*), হ্যাশ (#) বা কোডিং সিম্বল রাখবেন না।
     """
 
     messages = [{"role": "system", "content": system_prompt}]
@@ -94,56 +77,24 @@ def chat():
 
         if "choices" in result and len(result["choices"]) > 0:
             reply = result["choices"][0]["message"]["content"]
-
-            # ডাইনামিক UI কন্ট্রোল চেক (JSON Extract)
             ui_updates = {}
+
             if "[[UI_UPDATE:" in reply and "]]" in reply:
                 try:
                     start_idx = reply.find("[[UI_UPDATE:") + len("[[UI_UPDATE:")
                     end_idx = reply.find("]]", start_idx)
                     json_str = reply[start_idx:end_idx].strip()
                     ui_updates = json.loads(json_str)
-                    # আসল উত্তর থেকে কমান্ড অংশটুকু সরিয়ে ফেলা
                     reply = reply[:reply.find("[[UI_UPDATE:")].strip()
                 except Exception as json_err:
-                    print("JSON Parse Error:", json_err)
+                    print("JSON Extraction Error:", json_err)
 
-            # মানুষের মতো কথা বলার জন্য হ্যাশ ও স্টার ফিল্টার
             clean_reply = reply.replace("*", "").replace("#", "").strip()
 
-            if firebase_admin._apps:
+            if firebase_admin._apps and ui_updates:
                 try:
-                    # চ্যাট হিস্ট্রি জমা রাখা
-                    db.reference('/chats').push({"user": msg, "robot": clean_reply})
-                    
-                    # ১. ক্যামেরা স্ট্যাটাস লজিক
-                    if "ক্যামেরা" in msg and ("অন" in msg or "চালু" in msg):
-                        db.reference('/robot_status/camera').set("ON")
-                    elif "ক্যামেরা" in msg and ("অফ" in msg or "বন্ধ" in msg):
-                        db.reference('/robot_status/camera').set("OFF")
-
-                    # ২. এআই কর্তৃক পাওয়া ডাইনামিক UI/লজিক আপডেট ফায়ারবেসে সেভ করা
-                    if ui_updates:
-                        for key, val in ui_updates.items():
-                            db.reference(f'/ui_config/{key}').set(val)
-
-                    # ৩. ম্যানুয়াল ভয়েস কমান্ড ফিল্টার (অতিরিক্ত সুরক্ষার জন্য)
-                    if "রং" in msg or "কালার" in msg:
-                        if "লাল" in msg:
-                            db.reference('/ui_config/bg_color').set("red")
-                        elif "সবুজ" in msg:
-                            db.reference('/ui_config/bg_color').set("green")
-                        elif "কালো" in msg or "ডার্ক" in msg:
-                            db.reference('/ui_config/bg_color').set("#121212")
-                        elif "সাদা" in msg:
-                            db.reference('/ui_config/bg_color').set("#ffffff")
-
-                    if "বাটন" in msg:
-                        if "বন্ধ" in msg or "লুকিয়ে" in msg or "হাইড" in msg:
-                            db.reference('/ui_config/show_buttons').set(False)
-                        elif "দেখা" in msg or "অন" in msg or "চালু" in msg:
-                            db.reference('/ui_config/show_buttons').set(True)
-
+                    for key, val in ui_updates.items():
+                        db.reference(f'/ui_config/{key}').set(val)
                 except Exception as fb_err:
                     print("Firebase Write Error:", fb_err)
 
