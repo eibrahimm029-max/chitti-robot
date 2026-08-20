@@ -44,7 +44,6 @@
             text-shadow: 0 0 10px #00ffcc;
         }
 
-        /* রোবট ফেস অ্যানিমেশন ক্যানভাস */
         #robotFace {
             background: #000;
             border: 2px solid #00ffcc;
@@ -77,7 +76,18 @@
             text-align: left;
         }
 
-        /* ফিক্সড কন্ট্রোল সুইচ এলাকা */
+        /* লাইভ সেন্সর ড্যাশবোর্ড CSS */
+        .sensor-container {
+            display: flex;
+            justify-content: space-around;
+            background: rgba(0, 0, 0, 0.5);
+            padding: 10px;
+            border-radius: 10px;
+            border: 1px solid #00ffcc;
+            margin: 10px 0;
+            font-size: 14px;
+        }
+
         .switches-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
@@ -146,14 +156,20 @@
 <body>
     <div class="box">
         <h2 id="appHeader">🤖 চিঠি এআই রোবট</h2>
-        <div class="status-badge" id="roleBadge">মোড: চিহ্নিতকরণ করা হচ্ছে...</div>
+        <div class="status-badge" id="roleBadge">ইউজার মোড: Guest</div>
         
-        <!-- রোবটের লাইভ ফেস অ্যানিমেশন -->
+        <!-- অ্যানিমেটেড রোবট ফেস -->
         <canvas id="robotFace" width="280" height="120"></canvas>
 
         <div id="reply">আমি প্রস্তুত! আপনার নির্দেশ দিন।</div>
 
-        <!-- ম্যানুয়াল ফিক্সড কন্ট্রোল বাটন -->
+        <!-- লাইভ সেন্সর ডাটা ড্যাশবোর্ড -->
+        <div class="sensor-container">
+            <div>🌡️ তাপমাত্রা: <span id="tempVal">--</span>°C</div>
+            <div>🔥 গ্যাস: <span id="gasVal">স্বাভাবিক</span></div>
+        </div>
+
+        <!-- ফিক্সড হোম কন্ট্রোল সুইচ -->
         <div class="switches-grid">
             <button class="switch-btn" onclick="toggleDevice('light')">💡 লাইট অন/অফ</button>
             <button class="switch-btn" onclick="toggleDevice('fan')">🌀 ফ্যান অন/অফ</button>
@@ -167,19 +183,33 @@
     </div>
 
     <script>
-        const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
-        let currentUserRole = "Guest"; // ব্যাকএন্ড থেকে পরিবর্তন হবে
+        const firebaseConfig = {
+            databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com"
+        };
 
-        // ফেস অ্যানিমেশন (Canvas)
+        if (!firebase.apps.length) {
+            firebase.initializeApp(firebaseConfig);
+        }
+
+        // ফায়ারবেস থেকে লাইভ সেন্সর ডাটা পড়া
+        firebase.database().ref('sensors').on('value', function(snapshot) {
+            const data = snapshot.val();
+            if (data) {
+                if (data.temperature) document.getElementById('tempVal').innerText = data.temperature;
+                if (data.gas) document.getElementById('gasVal').innerText = data.gas;
+            }
+        });
+
+        const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
+        
         const canvas = document.getElementById('robotFace');
         const ctx = canvas.getContext('2d');
-        let eyeState = 'idle'; // idle, listening, speaking
+        let eyeState = 'idle';
 
         function drawFace() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#00ffcc";
 
-            // চোখ আঁকা
             if (eyeState === 'listening') {
                 ctx.shadowBlur = 15;
                 ctx.shadowColor = "#00ffcc";
@@ -194,7 +224,6 @@
                 ctx.fillRect(180, 40, 40, 20);
             }
 
-            // মুখ বা সাউন্ড ওয়েভ আঁকা
             ctx.beginPath();
             if (eyeState === 'speaking') {
                 ctx.lineWidth = 4;
@@ -267,7 +296,7 @@
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({
                         message: msg,
-                        user_id: "owner_voice_sample" // ব্যাকএন্ড ভয়েস বায়োমেট্রিক আইডি
+                        user_id: "owner_voice_sample"
                     })
                 });
 
@@ -285,7 +314,6 @@
         }
 
         function toggleDevice(device) {
-            // ম্যানুয়াল সুইচ সিগন্যাল হ্যান্ডলিং
             document.getElementById('userInput').value = device + " অন অফ করো";
             sendMsg();
         }
