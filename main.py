@@ -11,7 +11,7 @@ from firebase_admin import credentials, db
 app = Flask(__name__)
 CORS(app)
 
-GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
+GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
 FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
 
 FIREBASE_CREDS = (
@@ -63,7 +63,7 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
 
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti Dynamic Gemini AI Active"})
+    return jsonify({"status": "Chitti Super Fast Groq AI Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -73,8 +73,8 @@ def chat():
     if not msg:
         return jsonify({"reply": "অনুগ্রহ করে কোনো নির্দেশ দিন।"})
 
-    if not GEMINI_KEY:
-        return jsonify({"reply": "Gemini API Key পাওয়া যায়নি! Render-এ GEMINI_API_KEY সেট করুন।"})
+    if not GROQ_KEY:
+        return jsonify({"reply": "Groq API Key পাওয়া যায়নি! Render-এ GROQ_API_KEY সেট করুন।"})
 
     system_prompt = """
     আপনি 'চিঠি রোবট'—একটি অতি চতুর ও ডাইনামিক এআই। 
@@ -97,60 +97,56 @@ def chat():
     - সম্পূর্ণ সহজ বাংলায় উত্তর দিন। কোনো স্টার (*), হ্যাশ (#) ব্যবহার করবেন না।
     """
 
-    payload = {
-        "contents": [
-            {
-                "parts": [
-                    {"text": f"{system_prompt}\n\nইউজার বার্তা: {msg}"}
-                ]
-            }
-        ]
+    headers = {
+        "Authorization": f"Bearer {GROQ_KEY}",
+        "Content-Type": "application/json"
     }
 
-    # গুগলের বর্তমান অফিসিয়াল সঠিক মডেলগুলোর নাম
-    models = ["gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-2.0-flash-exp"]
-    
-    reply_text = ""
-    last_error = ""
+    payload = {
+        "model": "llama-3.3-70b-versatile",
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": msg}
+        ],
+        "temperature": 0.7
+    }
 
-    for model_name in models:
-        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_KEY}"
-        try:
-            response = requests.post(
-                url=url,
-                headers={"Content-Type": "application/json"},
-                json=payload,
-                timeout=10
-            )
-            result = response.json()
+    try:
+        response = requests.post(
+            url="https://api.groq.com/openai/v1/chat/completions",
+            headers=headers,
+            json=payload,
+            timeout=10
+        )
 
-            if "candidates" in result and len(result["candidates"]) > 0:
-                reply_text = result["candidates"][0]["content"]["parts"][0]["text"]
-                break
-            elif "error" in result:
-                last_error = result["error"].get("message", "")
-        except Exception as e:
-            last_error = str(e)
-            continue
+        result = response.json()
 
-    if reply_text:
-        ui_action = {}
-        if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
-            try:
-                start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
-                end_idx = reply_text.find("]]", start_idx)
-                json_str = reply_text[start_idx:end_idx].strip()
-                ui_action = json.loads(json_str)
-                reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
-            except Exception as json_err:
-                print("JSON extraction error:", json_err)
+        if "choices" in result and len(result["choices"]) > 0:
+            reply_text = result["choices"][0]["message"]["content"]
+            ui_action = {}
 
-        clean_reply = reply_text.replace("*", "").replace("#", "").strip()
-        threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
+            if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
+                try:
+                    start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
+                    end_idx = reply_text.find("]]", start_idx)
+                    json_str = reply_text[start_idx:end_idx].strip()
+                    ui_action = json.loads(json_str)
+                    reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
+                except Exception as json_err:
+                    print("JSON extraction error:", json_err)
 
-        return jsonify({"reply": clean_reply})
-    else:
-        return jsonify({"reply": f"সমস্যা সমাধান করা সম্ভব হয়নি। এরর: {last_error}"})
+            clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+
+            threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
+
+            return jsonify({"reply": clean_reply})
+        elif "error" in result:
+            return jsonify({"reply": f"API এরর: {result['error'].get('message', 'অজানা সমস্যা')}"})
+        else:
+            return jsonify({"reply": "আমি কথাটি বুঝতে পারিনি, আরেকবার বলবেন?"})
+
+    except Exception as e:
+        return jsonify({"reply": f"সার্ভার এরর: {str(e)}"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
