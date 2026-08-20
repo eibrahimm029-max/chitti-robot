@@ -108,7 +108,7 @@ def chat():
     }
 
     # v1beta ভার্সন এবং সঠিক মডেল নেম ব্যবহার করা হয়েছে
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
 
     try:
         response = requests.post(
