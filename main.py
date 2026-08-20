@@ -30,9 +30,6 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
         print("Firebase Init Error:", e)
 
 def authenticate_user(user_id):
-    """
-    ইউজারের রোল এবং এক্সেস লেভেল ভেরিফাই করা (Voice/ID Match)
-    """
     if not firebase_admin._apps:
         return "Guest"
     try:
@@ -48,7 +45,6 @@ def async_firebase_save(user_msg, ai_reply, user_role):
         return
     try:
         timestamp = str(int(time.time()))
-        # সাধারণ চ্যাট হিস্ট্রি
         db.reference(f'/chat_history/{timestamp}').set({
             "user": user_msg,
             "bot": ai_reply,
@@ -74,10 +70,9 @@ def chat():
     if not OPENROUTER_KEY:
         return jsonify({"reply": "API Key পাওয়া যায়নি! Render-এ OPENROUTER_API_KEY সেট করুন।"})
 
-    # ১. ইউজার এক্সেস লেভেল যাচাই করা
     user_role = authenticate_user(user_id)
 
-    # ২. গেস্ট সিকিউরিটি ফিল্টার (গেস্টদের জন্য হোম ডিভাইস এক্সেস সম্পূর্ণ বন্ধ)
+    # গেস্ট মোডের জন্য ডিভাইস ফিল্টারিং লজিক
     device_keywords = ["অন", "অফ", "চালাও", "বন্ধ", "লাইট", "ফ্যান", "ডিলিট", "মুছে"]
     if user_role == "Guest" and any(key in msg for key in device_keywords):
         return jsonify({
@@ -121,8 +116,9 @@ def chat():
         }
 
         try:
+            # সঠিক OpenRouter Endpoint URL
             response = requests.post(
-                url="https://openrouter.ai/ai/v1/chat/completions",
+                url="https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json=payload,
                 timeout=12
