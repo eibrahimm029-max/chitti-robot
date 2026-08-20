@@ -107,7 +107,8 @@ def chat():
         ]
     }
 
-    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    # v1beta ভার্সন এবং সঠিক মডেল নেম ব্যবহার করা হয়েছে
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key={GEMINI_KEY}"
 
     try:
         response = requests.post(
@@ -148,3 +149,4 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+            
