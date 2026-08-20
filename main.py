@@ -11,7 +11,7 @@ from firebase_admin import credentials, db
 app = Flask(__name__)
 CORS(app)
 
-OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
+GEMINI_KEY = os.environ.get("GEMINI_API_KEY", "").strip()
 FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
 
 FIREBASE_CREDS = (
@@ -63,33 +63,32 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
 
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti Multi-Model AI Active"})
+    return jsonify({"status": "Chitti Super Fast Direct Gemini AI Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json or {}
     msg = data.get("message", "").strip()
-    history = data.get("history", [])
 
     if not msg:
         return jsonify({"reply": "অনুগ্রহ করে কোনো নির্দেশ দিন।"})
 
-    if not OPENROUTER_KEY:
-        return jsonify({"reply": "OpenRouter API Key পাওয়া যায়নি!"})
+    if not GEMINI_KEY:
+        return jsonify({"reply": "Gemini API Key পাওয়া যায়নি! Render-এ GEMINI_API_KEY সেট করুন।"})
 
     system_prompt = """
     আপনি 'চিঠি রোবট'—একটি অতি চতুর ও ডাইনামিক এআই। 
     
     আচরণের নিয়মাবলী:
-    ১. ইউজার সাধারণ কথা বা গল্প বললে মানুষের মতো প্রমিত বাংলায় সহজ উত্তর দিন।
-    ২. ইউজার কোনো বাটন, ইনপুট বা স্ক্রিনের ডায়নামিক পরিবর্তন করতে বললে উত্তরের সাথে JSON অ্যাকশন যুক্ত করবেন।
+    ১. ইউজার সাধারণ কথা বা গল্প করলে মানুষের মতো প্রমিত বাংলায় সহজ উত্তর দিন।
+    ২. ইউজার কোনো বাটন, ইনপুট বা স্ক্রিনের ডাইনামিক পরিবর্তন করতে বললে উত্তরের সাথে JSON অ্যাকশন যুক্ত করবেন।
 
     JSON ফরম্যাট:
     [[UI_ACTION: {
-        "action": "ADD" (অথবা "DELETE" বা "CLEAR_ALL"),
+        "action": "ADD",
         "feature_id": "unique_id",
-        "bg_color": "red" (ঐচ্ছিক),
-        "app_title": "নতুন নাম" (ঐচ্ছিক),
+        "bg_color": "red",
+        "app_title": "নতুন নাম",
         "html_code": "<button onclick='alert(\"চালু হয়েছে\")'>বাটন</button>",
         "js_code": "console.log('Active');"
     }]]
@@ -98,64 +97,47 @@ def chat():
     - সম্পূর্ণ সহজ বাংলায় উত্তর দিন। কোনো স্টার (*), হ্যাশ (#) ব্যবহার করবেন না।
     """
 
-    messages = [{"role": "system", "content": system_prompt}]
-    for h in history[-6:]:
-        messages.append(h)
-    messages.append({"role": "user", "content": msg})
+    full_prompt = f"{system_prompt}\n\nইউজার বার্তা: {msg}"
 
-    # ১টি কাজ না করলে অন্যটি অটো চেষ্টা করার জন্য ফ্রি মডেলের তালিকা
-    free_models = [
-        "meta-llama/llama-3.1-8b-instruct:free",
-        "mistralai/mistral-7b-instruct:free",
-        "qwen/qwen-2.5-72b-instruct:free"
-    ]
+    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
 
-    reply_text = ""
+    try:
+        response = requests.post(
+            url=url,
+            headers={"Content-Type": "application/json"},
+            json={
+                "contents": [{"parts": [{"text": full_prompt}]}]
+            },
+            timeout=8
+        )
 
-    for model in free_models:
-        try:
-            response = requests.post(
-                url="https://openrouter.ai/api/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {OPENROUTER_KEY}",
-                    "Content-Type": "application/json"
-                },
-                json={
-                    "model": model,
-                    "messages": messages,
-                    "temperature": 0.7
-                },
-                timeout=7
-            )
+        result = response.json()
 
-            result = response.json()
+        if "candidates" in result and len(result["candidates"]) > 0:
+            reply_text = result["candidates"][0]["content"]["parts"][0]["text"]
+            ui_action = {}
 
-            if "choices" in result and len(result["choices"]) > 0:
-                reply_text = result["choices"][0]["message"]["content"]
-                if reply_text:
-                    break
-        except Exception as e:
-            continue
+            if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
+                try:
+                    start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
+                    end_idx = reply_text.find("]]", start_idx)
+                    json_str = reply_text[start_idx:end_idx].strip()
+                    ui_action = json.loads(json_str)
+                    reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
+                except Exception as json_err:
+                    print("JSON extraction error:", json_err)
 
-    if reply_text:
-        ui_action = {}
-        if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
-            try:
-                start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
-                end_idx = reply_text.find("]]", start_idx)
-                json_str = reply_text[start_idx:end_idx].strip()
-                ui_action = json.loads(json_str)
-                reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
-            except Exception as json_err:
-                print("JSON Extraction Error:", json_err)
+            clean_reply = reply_text.replace("*", "").replace("#", "").strip()
 
-        clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+            threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
 
-        threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
+            return jsonify({"reply": clean_reply})
+        else:
+            return jsonify({"reply": "আমি কথাটি বুঝতে পারিনি, আরেকবার বলবেন?"})
 
-        return jsonify({"reply": clean_reply})
-    else:
-        return jsonify({"reply": "আমি বুঝতে পেরেছি, দয়া করে কথাটি আবার একটু স্পষ্ট করে বলুন।"})
+    except Exception as e:
+        return jsonify({"reply": "সার্ভারে সংযোগ করতে সমস্যা হচ্ছে।"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+            
