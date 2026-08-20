@@ -11,7 +11,7 @@ from firebase_admin import credentials, db
 app = Flask(__name__)
 CORS(app)
 
-GROQ_KEY = os.environ.get("GROQ_API_KEY", "").strip()
+OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
 
 FIREBASE_CREDS = (
@@ -63,7 +63,7 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
 
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti Smooth AI Active"})
+    return jsonify({"status": "Chitti OpenRouter AI Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -73,8 +73,8 @@ def chat():
     if not msg:
         return jsonify({"reply": "অনুগ্রহ করে কোনো নির্দেশ দিন।"})
 
-    if not GROQ_KEY:
-        return jsonify({"reply": "Groq API Key পাওয়া যায়নি! Render-এ GROQ_API_KEY সেট করুন।"})
+    if not OPENROUTER_KEY:
+        return jsonify({"reply": "API Key পাওয়া যায়নি! Render-এ OPENROUTER_API_KEY সেট করুন।"})
 
     system_prompt = """
     আপনি 'চিঠি রোবট'—একটি অতি চতুর ও ডাইনামিক এআই। 
@@ -98,56 +98,65 @@ def chat():
     """
 
     headers = {
-        "Authorization": f"Bearer {GROQ_KEY}",
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
         "Content-Type": "application/json"
     }
 
-    # স্থায়ী একক মডেল - কোনো পরিবর্তন বা এরর আসবে না
-    payload = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": msg}
-        ],
-        "temperature": 0.7
-    }
+    # OpenRouter-এর সম্পূর্ণ ফ্রি মডেলসমূহ (একটি ফেইল করলে অন্যটিতে অটো চলে যাবে)
+    free_models = [
+        "meta-llama/llama-3.2-11b-vision-instruct:free",
+        "google/gemma-2-9b-it:free",
+        "mistralai/mistral-7b-instruct:free"
+    ]
 
-    try:
-        response = requests.post(
-            url="https://api.groq.com/openai/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=10
-        )
+    reply_text = ""
+    last_error = ""
 
-        result = response.json()
+    for model_name in free_models:
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": msg}
+            ]
+        }
 
-        if "choices" in result and len(result["choices"]) > 0:
-            reply_text = result["choices"][0]["message"]["content"]
-            ui_action = {}
+        try:
+            response = requests.post(
+                url="https://openrouter.ai/api/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=10
+            )
+            result = response.json()
 
-            if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
-                try:
-                    start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
-                    end_idx = reply_text.find("]]", start_idx)
-                    json_str = reply_text[start_idx:end_idx].strip()
-                    ui_action = json.loads(json_str)
-                    reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
-                except Exception as json_err:
-                    print("JSON extraction error:", json_err)
+            if "choices" in result and len(result["choices"]) > 0:
+                reply_text = result["choices"][0]["message"]["content"]
+                break
+            elif "error" in result:
+                last_error = result["error"].get("message", "")
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-            clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+    if reply_text:
+        ui_action = {}
+        if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
+            try:
+                start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
+                end_idx = reply_text.find("]]", start_idx)
+                json_str = reply_text[start_idx:end_idx].strip()
+                ui_action = json.loads(json_str)
+                reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
+            except Exception as json_err:
+                print("JSON extraction error:", json_err)
 
-            threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
+        clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+        threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
 
-            return jsonify({"reply": clean_reply})
-        elif "error" in result:
-            return jsonify({"reply": f"API এরর: {result['error'].get('message', 'অজানা সমস্যা')}"})
-        else:
-            return jsonify({"reply": "আমি কথাটি বুঝতে পারিনি, আরেকবার বলবেন?"})
-
-    except Exception as e:
-        return jsonify({"reply": f"সার্ভার এরর: {str(e)}"})
+        return jsonify({"reply": clean_reply})
+    else:
+        return jsonify({"reply": f"API এরর: {last_error}"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
