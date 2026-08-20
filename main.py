@@ -102,51 +102,65 @@ def chat():
         "Content-Type": "application/json"
     }
 
-    payload = {
-        "model": "llama-3.1-8b-instant",
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": msg}
-        ],
-        "temperature": 0.7
-    }
+    # Groq-এর একাধিক ফ্রি মডেলের নাম (একটি ব্যর্থ হলে স্বয়ংক্রিয়ভাবে পরেরটি চালু হবে)
+    groq_models = [
+        "llama-3.1-8b-instant",
+        "llama3-8b-8192",
+        "mixtral-8x7b-32768",
+        "gemma2-9b-it"
+    ]
 
-    try:
-        response = requests.post(
-            url="https://api.groq.com/openai/v1/chat/completions",
-            headers=headers,
-            json=payload,
-            timeout=10
-        )
+    reply_text = ""
+    last_error = ""
 
-        result = response.json()
+    for model_name in groq_models:
+        payload = {
+            "model": model_name,
+            "messages": [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": msg}
+            ],
+            "temperature": 0.7
+        }
 
-        if "choices" in result and len(result["choices"]) > 0:
-            reply_text = result["choices"][0]["message"]["content"]
-            ui_action = {}
+        try:
+            response = requests.post(
+                url="https://api.groq.com/openai/v1/chat/completions",
+                headers=headers,
+                json=payload,
+                timeout=8
+            )
 
-            if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
-                try:
-                    start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
-                    end_idx = reply_text.find("]]", start_idx)
-                    json_str = reply_text[start_idx:end_idx].strip()
-                    ui_action = json.loads(json_str)
-                    reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
-                except Exception as json_err:
-                    print("JSON extraction error:", json_err)
+            result = response.json()
 
-            clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+            if "choices" in result and len(result["choices"]) > 0:
+                reply_text = result["choices"][0]["message"]["content"]
+                break
+            elif "error" in result:
+                last_error = result["error"].get("message", "")
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-            threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
+    if reply_text:
+        ui_action = {}
+        if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
+            try:
+                start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
+                end_idx = reply_text.find("]]", start_idx)
+                json_str = reply_text[start_idx:end_idx].strip()
+                ui_action = json.loads(json_str)
+                reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
+            except Exception as json_err:
+                print("JSON extraction error:", json_err)
 
-            return jsonify({"reply": clean_reply})
-        elif "error" in result:
-            return jsonify({"reply": f"API এরর: {result['error'].get('message', 'অজানা সমস্যা')}"})
-        else:
-            return jsonify({"reply": "আমি কথাটি বুঝতে পারিনি, আরেকবার বলবেন?"})
+        clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+        threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
 
-    except Exception as e:
-        return jsonify({"reply": f"সার্ভার এরর: {str(e)}"})
+        return jsonify({"reply": clean_reply})
+    else:
+        return jsonify({"reply": f"API এরর: {last_error}"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+                                                         
