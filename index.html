@@ -64,7 +64,6 @@
             padding: 10px;
             border-radius: 8px;
         }
-        /* ডায়নামিক নতুন ফিচার যোগ করার জন্য কনটেইনার */
         #dynamicFeatureArea {
             margin-top: 15px;
             padding: 10px;
@@ -73,6 +72,10 @@
             gap: 10px;
             justify-content: center;
         }
+        .feature-wrapper {
+            display: inline-block;
+            margin: 5px;
+        }
     </style>
 </head>
 <body>
@@ -80,7 +83,7 @@
         <h2 id="appHeader">🤖 চিঠি অটোমেটেড রোবট</h2>
         <div id="reply">আমি প্রস্তুত! আপনার যেকোনো নির্দেশ দিন।</div>
         
-        <!-- নতুন নতুন ফিচার অটো তৈরি হয়ে এখানে বসবে -->
+        <!-- নতুন হাজার হাজার ডায়নামিক ফিচার বা বাটন এখানে জমা হবে -->
         <div id="dynamicFeatureArea"></div>
 
         <br>
@@ -100,9 +103,8 @@
             firebase.initializeApp(firebaseConfig);
         }
 
-        // ফায়ারবেস রিয়েলটাইম সেলফ-বিল্ডিং লিসেনার
-        const uiRef = firebase.database().ref('ui_config');
-        uiRef.on('value', function(snapshot) {
+        // কালার ও অ্যাপ টাইটেল পাওয়ার রিয়েলটাইম লিসেনার
+        firebase.database().ref('ui_config').on('value', function(snapshot) {
             const config = snapshot.val();
             if (config) {
                 if (config.bg_color) document.body.style.backgroundColor = config.bg_color;
@@ -110,14 +112,29 @@
                     document.getElementById('appHeader').innerText = "🤖 " + config.app_title;
                     document.getElementById('pageTitle').innerText = config.app_title;
                 }
-                // ব্যাকএন্ড থেকে নতুন কোনো HTML ফিচার আসলে স্ক্রিনে অটো রেন্ডার করা
-                if (config.custom_html) {
-                    document.getElementById('dynamicFeatureArea').innerHTML = config.custom_html;
-                }
-                // ব্যাকএন্ড থেকে নতুন কোনো JS লজিক আসলে তা নিজে নিজেই এক্সিকিউট করা
-                if (config.custom_js) {
-                    try { eval(config.custom_js); } catch(e) { console.log(e); }
-                }
+            }
+        });
+
+        // ফায়ারবেস থেকে সব ফিচার আলাদাভাবে রিড করা (পুরোনো ফিচার ডিলিট না করে জমা রাখা)
+        firebase.database().ref('features').on('value', function(snapshot) {
+            const features = snapshot.val();
+            const container = document.getElementById('dynamicFeatureArea');
+            container.innerHTML = ""; 
+
+            if (features) {
+                Object.keys(features).forEach(function(key) {
+                    const item = features[key];
+                    if (item.html_code) {
+                        const wrapper = document.createElement('div');
+                        wrapper.className = 'feature-wrapper';
+                        wrapper.id = 'feature_' + key;
+                        wrapper.innerHTML = item.html_code;
+                        container.appendChild(wrapper);
+                    }
+                    if (item.js_code) {
+                        try { eval(item.js_code); } catch(e) { console.log(e); }
+                    }
+                });
             }
         });
 
