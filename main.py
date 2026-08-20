@@ -35,39 +35,30 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
     try:
         timestamp = str(int(time.time()))
         
-        # ১. কথাবার্তা আলাদা সেভ হবে (/chat_history)
         db.reference(f'/chat_history/{timestamp}').set({
             "user": user_msg,
             "bot": ai_reply,
             "timestamp": timestamp
         })
 
-        # ২. কমান্ড ও ফিচার সম্পূর্ণ আলাদা সেভ হবে
         if ui_action:
             action_type = ui_action.get("action")
             feature_id = ui_action.get("feature_id", "feature_" + timestamp)
 
-            # মূল কমান্ড লগে জমা
             db.reference(f'/commands/{timestamp}').set({
                 "command_type": action_type,
                 "target_id": feature_id,
                 "details": ui_action
             })
 
-            # একটি নির্দিষ্ট ফিচার যোগ করা (/active_features)
             if action_type == "ADD":
                 db.reference(f'/active_features/{feature_id}').set(ui_action)
-            
-            # নির্দিষ্ট ফিচার এককভাবে ডিলিট করা
             elif action_type == "DELETE":
                 if feature_id:
                     db.reference(f'/active_features/{feature_id}').delete()
-            
-            # সব সক্রিয় ফিচার একসাথে রিসেট করা
             elif action_type == "CLEAR_ALL":
                 db.reference('/active_features').delete()
 
-            # ব্যাকগ্রাউন্ড ও টাইটেল সেটিংস আলাদা রাখা (/ui_config)
             if "bg_color" in ui_action:
                 db.reference('/ui_config/bg_color').set(ui_action["bg_color"])
             if "app_title" in ui_action:
@@ -76,9 +67,23 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
     except Exception as fb_err:
         print("Async Firebase Save Error:", fb_err)
 
+def get_current_app_context():
+    """ফায়ারবেস থেকে একটিভ ফিচার এবং ব্যাকগ্রাউন্ড ডাটা পড়ে এআইকে জানানোর জন্য"""
+    context_info = ""
+    if firebase_admin._apps:
+        try:
+            active_feats = db.reference('/active_features').get()
+            if active_feats:
+                context_info += f"\nবর্তমানে স্ক্রিনে থাকা একটিভ ফিচারসমূহ: {json.dumps(active_feats, ensure_ascii=False)}"
+            else:
+                context_info += "\nবর্তমানে স্ক্রিনে কোনো বাড়তি ফিচার বা বাটন নেই।"
+        except Exception as e:
+            print("Context Read Error:", e)
+    return context_info
+
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti Organized Storage Active"})
+    return jsonify({"status": "Chitti Fully Integrated Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -91,27 +96,24 @@ def chat():
     if not OPENROUTER_KEY:
         return jsonify({"reply": "API Key পাওয়া যায়নি! Render-এ OPENROUTER_API_KEY সেট করুন।"})
 
-    # শক্ত প্রম্পট নিয়মাবলী (যাতে মনগড়া কাজ না করে)
-    system_prompt = """
-    আপনি 'চিঠি রোবট'। আপনি ইউজারের নির্দেশ হুবহু মেনে চলবেন। 
+    # ফায়ারবেস থেকে বর্তমান স্টেট নিয়ে প্রম্পটে যুক্ত করা হচ্ছে
+    app_context = get_current_app_context()
 
-    আচরণের কঠোর নিয়মাবলী:
-    ১. কথা বা গল্পের ক্ষেত্রে প্রমিত বাংলায় কোনো স্টার (*) ছাড়া সহজ উত্তর দেবেন।
-    ২. ইউজার নির্দিষ্ট কিছু মুছতে বললে কেবল সেটিই মুছবেন (DELETE কমান্ড ব্যবহার করে)।
-    ৩. ইউজার যা করতে বলবে তার বাইরে নিজের মন থেকে বাড়তি কোনো বাটন বা অপশন বানাবেন না।
+    system_prompt = f"""
+    আপনি 'চিঠি অটোমেটেড রোবট'। আপনি ইউজারের স্ক্রিন ও ফায়ারবেস ডেটাবেজ সরাসরি পর্যবেক্ষণ করছেন।
 
-    JSON নির্দেশনার ফরম্যাট (যদি কোনো কমান্ড থাকে):
-    [[UI_ACTION: {
-        "action": "ADD",
-        "feature_id": "video_player",
-        "html_code": "..."
-    }]]
+    বর্তমান সিস্টেম স্টেট:{app_context}
 
-    নির্দিষ্ট কাজ মুছে ফেলার জন্য:
-    [[UI_ACTION: {
+    আচরণের নিয়মাবলী:
+    ১. ইউজার যখনই স্ক্রিনের কোনো কিছু মোছার কথা বলবে, আপনি কখনো বলবেন না যে "আমি ডাটাবেস দেখতে পারি না"।
+    ২. কোনো ফিচার বা ভিডিও মুছতে বললে সাথে সাথে JSON ফরম্যাটে 'DELETE' বা 'CLEAR_ALL' একশন পাঠাবেন।
+    ৩. উত্তর সবসময় সহজ প্রমিত বাংলায় দিবেন। কোনো প্রকার স্টার (*) বা বিশেষ চিহ্ন ব্যবহার করবেন না।
+
+    JSON ফরম্যাট:
+    [[UI_ACTION: {{
         "action": "DELETE",
         "feature_id": "video_player"
-    }]]
+    }}]]
     """
 
     headers = {
@@ -178,4 +180,4 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-    
+            
