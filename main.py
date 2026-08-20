@@ -99,14 +99,17 @@ def chat():
 
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}",
-        "Content-Type": "application/json"
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com",
+        "X-Title": "Chitti Robot"
     }
 
-    # OpenRouter-এর সম্পূর্ণ ফ্রি মডেলসমূহ (একটি ফেইল করলে অন্যটিতে অটো চলে যাবে)
+    # OpenRouter-এর স্থায়ী ফ্রি অটো-রাউটিং এবং ১০০% সচল ফ্রি মডেলসমূহ
     free_models = [
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
+        "openrouter/auto",
         "google/gemma-2-9b-it:free",
-        "mistralai/mistral-7b-instruct:free"
+        "meta-llama/llama-3.2-11b-vision-instruct:free",
+        "qwen/qwen-2.5-7b-instruct:free"
     ]
 
     reply_text = ""
@@ -126,7 +129,7 @@ def chat():
                 url="https://openrouter.ai/api/v1/chat/completions",
                 headers=headers,
                 json=payload,
-                timeout=10
+                timeout=12
             )
             result = response.json()
 
@@ -160,4 +163,3 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-                
