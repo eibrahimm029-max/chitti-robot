@@ -97,18 +97,24 @@ def chat():
     - সম্পূর্ণ সহজ বাংলায় উত্তর দিন। কোনো স্টার (*), হ্যাশ (#) ব্যবহার করবেন না।
     """
 
-    full_prompt = f"{system_prompt}\n\nইউজার বার্তা: {msg}"
+    payload = {
+        "contents": [
+            {
+                "parts": [
+                    {"text": f"{system_prompt}\n\nইউজার বার্তা: {msg}"}
+                ]
+            }
+        ]
+    }
 
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    url = f"https://generativelanguage.googleapis.com/v1/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
 
     try:
         response = requests.post(
             url=url,
             headers={"Content-Type": "application/json"},
-            json={
-                "contents": [{"parts": [{"text": full_prompt}]}]
-            },
-            timeout=8
+            json=payload,
+            timeout=10
         )
 
         result = response.json()
@@ -132,11 +138,13 @@ def chat():
             threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
 
             return jsonify({"reply": clean_reply})
+        elif "error" in result:
+            return jsonify({"reply": f"API এরর: {result['error'].get('message', 'অজানা সমস্যা')}"})
         else:
             return jsonify({"reply": "আমি কথাটি বুঝতে পারিনি, আরেকবার বলবেন?"})
 
     except Exception as e:
-        return jsonify({"reply": "সার্ভারে সংযোগ করতে সমস্যা হচ্ছে।"})
+        return jsonify({"reply": f"সার্ভার এরর: {str(e)}"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
