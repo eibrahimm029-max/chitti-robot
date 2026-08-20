@@ -34,25 +34,40 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
         return
     try:
         timestamp = str(int(time.time()))
+        
+        # ১. কথাবার্তা আলাদা সেভ হবে (/chat_history)
         db.reference(f'/chat_history/{timestamp}').set({
             "user": user_msg,
             "bot": ai_reply,
-            "time": timestamp
+            "timestamp": timestamp
         })
 
+        # ২. কমান্ড ও ফিচার সম্পূর্ণ আলাদা সেভ হবে
         if ui_action:
             action_type = ui_action.get("action")
-            
-            if action_type == "ADD":
-                f_id = ui_action.get("feature_id", "feat_" + timestamp)
-                db.reference(f'/features/{f_id}').set(ui_action)
-            elif action_type == "DELETE":
-                f_id = ui_action.get("feature_id")
-                if f_id:
-                    db.reference(f'/features/{f_id}').delete()
-            elif action_type == "CLEAR_ALL":
-                db.reference('/features').delete()
+            feature_id = ui_action.get("feature_id", "feature_" + timestamp)
 
+            # মূল কমান্ড লগে জমা
+            db.reference(f'/commands/{timestamp}').set({
+                "command_type": action_type,
+                "target_id": feature_id,
+                "details": ui_action
+            })
+
+            # একটি নির্দিষ্ট ফিচার যোগ করা (/active_features)
+            if action_type == "ADD":
+                db.reference(f'/active_features/{feature_id}').set(ui_action)
+            
+            # নির্দিষ্ট ফিচার এককভাবে ডিলিট করা
+            elif action_type == "DELETE":
+                if feature_id:
+                    db.reference(f'/active_features/{feature_id}').delete()
+            
+            # সব সক্রিয় ফিচার একসাথে রিসেট করা
+            elif action_type == "CLEAR_ALL":
+                db.reference('/active_features').delete()
+
+            # ব্যাকগ্রাউন্ড ও টাইটেল সেটিংস আলাদা রাখা (/ui_config)
             if "bg_color" in ui_action:
                 db.reference('/ui_config/bg_color').set(ui_action["bg_color"])
             if "app_title" in ui_action:
@@ -63,7 +78,7 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
 
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti OpenRouter AI Active"})
+    return jsonify({"status": "Chitti Organized Storage Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -76,25 +91,27 @@ def chat():
     if not OPENROUTER_KEY:
         return jsonify({"reply": "API Key পাওয়া যায়নি! Render-এ OPENROUTER_API_KEY সেট করুন।"})
 
+    # শক্ত প্রম্পট নিয়মাবলী (যাতে মনগড়া কাজ না করে)
     system_prompt = """
-    আপনি 'চিঠি রোবট'—একটি অতি চতুর ও ডাইনামিক এআই। 
-    
-    আচরণের নিয়মাবলী:
-    ১. ইউজার সাধারণ কথা বা গল্প করলে মানুষের মতো প্রমিত বাংলায় সহজ উত্তর দিন।
-    ২. ইউজার কোনো বাটন, ইনপুট বা স্ক্রিনের ডাইনামিক পরিবর্তন করতে বললে উত্তরের সাথে JSON অ্যাকশন যুক্ত করবেন।
+    আপনি 'চিঠি রোবট'। আপনি ইউজারের নির্দেশ হুবহু মেনে চলবেন। 
 
-    JSON ফরম্যাট:
+    আচরণের কঠোর নিয়মাবলী:
+    ১. কথা বা গল্পের ক্ষেত্রে প্রমিত বাংলায় কোনো স্টার (*) ছাড়া সহজ উত্তর দেবেন।
+    ২. ইউজার নির্দিষ্ট কিছু মুছতে বললে কেবল সেটিই মুছবেন (DELETE কমান্ড ব্যবহার করে)।
+    ৩. ইউজার যা করতে বলবে তার বাইরে নিজের মন থেকে বাড়তি কোনো বাটন বা অপশন বানাবেন না।
+
+    JSON নির্দেশনার ফরম্যাট (যদি কোনো কমান্ড থাকে):
     [[UI_ACTION: {
         "action": "ADD",
-        "feature_id": "unique_id",
-        "bg_color": "red",
-        "app_title": "নতুন নাম",
-        "html_code": "<button onclick='alert(\"চালু হয়েছে\")'>বাটন</button>",
-        "js_code": "console.log('Active');"
+        "feature_id": "video_player",
+        "html_code": "..."
     }]]
 
-    কথাবার্তার নিয়ম:
-    - সম্পূর্ণ সহজ বাংলায় উত্তর দিন। কোনো স্টার (*), হ্যাশ (#) ব্যবহার করবেন না।
+    নির্দিষ্ট কাজ মুছে ফেলার জন্য:
+    [[UI_ACTION: {
+        "action": "DELETE",
+        "feature_id": "video_player"
+    }]]
     """
 
     headers = {
@@ -104,12 +121,10 @@ def chat():
         "X-Title": "Chitti Robot"
     }
 
-    # OpenRouter-এর স্থায়ী ফ্রি অটো-রাউটিং এবং ১০০% সচল ফ্রি মডেলসমূহ
     free_models = [
         "openrouter/auto",
         "google/gemma-2-9b-it:free",
-        "meta-llama/llama-3.2-11b-vision-instruct:free",
-        "qwen/qwen-2.5-7b-instruct:free"
+        "meta-llama/llama-3.2-11b-vision-instruct:free"
     ]
 
     reply_text = ""
@@ -163,3 +178,4 @@ def chat():
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+    
