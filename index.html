@@ -3,143 +3,216 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="pageTitle">চিঠি রোবট - ডায়নামিক এআই</title>
+    <title id="pageTitle">চিঠি এআই রোবট - সুপার কন্ট্রোল</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
         body { 
-            background: #080810; 
+            background: linear-gradient(135deg, #05050e 0%, #121225 100%); 
             color: #00ffcc; 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            font-family: 'Segoe UI', Arial, sans-serif; 
             text-align: center; 
-            padding: 20px; 
-            transition: all 0.5s ease;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 15px;
         }
+
         .box { 
-            border: 2px solid #00ffcc; 
-            padding: 25px; 
-            border-radius: 15px; 
-            max-width: 480px; 
-            margin: auto; 
-            box-shadow: 0 0 20px #00ffcc; 
-            background: #10101a; 
-            transition: all 0.5s ease;
+            border: 2px solid rgba(0, 255, 204, 0.3); 
+            padding: 20px; 
+            border-radius: 20px; 
+            width: 100%;
+            max-width: 450px; 
+            box-shadow: 0 0 30px rgba(0, 255, 204, 0.15); 
+            background: rgba(16, 16, 26, 0.85); 
+            backdrop-filter: blur(10px);
         }
+
+        h2 {
+            font-size: 22px;
+            margin-bottom: 10px;
+            text-shadow: 0 0 10px #00ffcc;
+        }
+
+        /* রোবট ফেস অ্যানিমেশন ক্যানভাস */
+        #robotFace {
+            background: #000;
+            border: 2px solid #00ffcc;
+            border-radius: 15px;
+            margin: 10px auto;
+            display: block;
+            box-shadow: inset 0 0 15px rgba(0, 255, 204, 0.4);
+        }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 12px;
+            font-size: 12px;
+            background: rgba(0, 255, 204, 0.1);
+            border: 1px solid #00ffcc;
+            margin-bottom: 10px;
+        }
+
+        #reply { 
+            margin: 10px 0; 
+            min-height: 55px; 
+            font-size: 15px; 
+            line-height: 1.5; 
+            color: #ffffff; 
+            background: rgba(0, 0, 0, 0.6);
+            padding: 12px;
+            border-radius: 10px;
+            border-left: 3px solid #00ffcc;
+            text-align: left;
+        }
+
+        /* ফিক্সড কন্ট্রোল সুইচ এলাকা */
+        .switches-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin: 15px 0;
+        }
+
+        .switch-btn {
+            background: #18182a;
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            padding: 10px;
+            border-radius: 8px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+
+        .switch-btn:hover {
+            background: #00ffcc;
+            color: #000;
+        }
+
+        .input-group {
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            gap: 8px;
+            margin-top: 10px;
+        }
+
         input[type="text"] { 
             background: #000; 
             border: 1px solid #00ffcc; 
             color: #00ffcc; 
-            padding: 12px; 
-            width: 50%; 
+            padding: 10px; 
+            flex: 1;
             border-radius: 8px; 
             outline: none; 
-            font-size: 15px; 
+            font-size: 14px; 
         }
-        button { 
+
+        .send-btn { 
             background: #00ffcc; 
             color: #000; 
             border: none; 
-            padding: 12px 15px; 
+            padding: 10px 15px; 
             font-weight: bold; 
             cursor: pointer; 
             border-radius: 8px; 
-            font-size: 15px; 
         }
+
         .mic-btn { 
             background: #ff0055; 
             color: white; 
+            border: none;
             border-radius: 50%; 
-            width: 44px; 
-            height: 44px; 
-        }
-        #reply { 
-            margin-top: 20px; 
-            min-height: 60px; 
-            font-size: 17px; 
-            line-height: 1.5; 
-            color: #ffffff; 
-            background: #00000055;
-            padding: 10px;
-            border-radius: 8px;
-        }
-        #dynamicFeatureArea {
-            margin-top: 15px;
-            padding: 10px;
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-        }
-        .feature-wrapper {
-            display: inline-block;
-            margin: 5px;
+            width: 40px; 
+            height: 40px; 
+            cursor: pointer;
+            box-shadow: 0 0 10px #ff0055;
+            font-size: 16px;
         }
     </style>
 </head>
 <body>
     <div class="box">
-        <h2 id="appHeader">🤖 চিঠি অটোমেটেড রোবট</h2>
-        <div id="reply">আমি প্রস্তুত! আপনার যেকোনো নির্দেশ দিন।</div>
+        <h2 id="appHeader">🤖 চিঠি এআই রোবট</h2>
+        <div class="status-badge" id="roleBadge">মোড: চিহ্নিতকরণ করা হচ্ছে...</div>
         
-        <!-- নতুন হাজার হাজার ডায়নামিক ফিচার বা বাটন এখানে জমা হবে -->
-        <div id="dynamicFeatureArea"></div>
+        <!-- রোবটের লাইভ ফেস অ্যানিমেশন -->
+        <canvas id="robotFace" width="280" height="120"></canvas>
 
-        <br>
-        <div style="display:flex; justify-content:center; align-items:center; gap: 5px;">
-            <input type="text" id="userInput" placeholder="কথা বলুন বা লিখুন...">
-            <button onclick="sendMsg()">পাঠান</button>
+        <div id="reply">আমি প্রস্তুত! আপনার নির্দেশ দিন।</div>
+
+        <!-- ম্যানুয়াল ফিক্সড কন্ট্রোল বাটন -->
+        <div class="switches-grid">
+            <button class="switch-btn" onclick="toggleDevice('light')">💡 লাইট অন/অফ</button>
+            <button class="switch-btn" onclick="toggleDevice('fan')">🌀 ফ্যান অন/অফ</button>
+        </div>
+
+        <div class="input-group">
+            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা ভয়েস দিন...">
+            <button class="send-btn" onclick="sendMsg()">পাঠান</button>
             <button class="mic-btn" onclick="startVoice()">🎤</button>
         </div>
     </div>
 
     <script>
-        const firebaseConfig = {
-            databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com"
-        };
-
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-
-        // কালার ও অ্যাপ টাইটেল পাওয়ার রিয়েলটাইম লিসেনার
-        firebase.database().ref('ui_config').on('value', function(snapshot) {
-            const config = snapshot.val();
-            if (config) {
-                if (config.bg_color) document.body.style.backgroundColor = config.bg_color;
-                if (config.app_title) {
-                    document.getElementById('appHeader').innerText = "🤖 " + config.app_title;
-                    document.getElementById('pageTitle').innerText = config.app_title;
-                }
-            }
-        });
-
-        // ফায়ারবেস থেকে সব ফিচার আলাদাভাবে রিড করা (পুরোনো ফিচার ডিলিট না করে জমা রাখা)
-        firebase.database().ref('features').on('value', function(snapshot) {
-            const features = snapshot.val();
-            const container = document.getElementById('dynamicFeatureArea');
-            container.innerHTML = ""; 
-
-            if (features) {
-                Object.keys(features).forEach(function(key) {
-                    const item = features[key];
-                    if (item.html_code) {
-                        const wrapper = document.createElement('div');
-                        wrapper.className = 'feature-wrapper';
-                        wrapper.id = 'feature_' + key;
-                        wrapper.innerHTML = item.html_code;
-                        container.appendChild(wrapper);
-                    }
-                    if (item.js_code) {
-                        try { eval(item.js_code); } catch(e) { console.log(e); }
-                    }
-                });
-            }
-        });
-
         const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
-        let conversationHistory = [];
+        let currentUserRole = "Guest"; // ব্যাকএন্ড থেকে পরিবর্তন হবে
+
+        // ফেস অ্যানিমেশন (Canvas)
+        const canvas = document.getElementById('robotFace');
+        const ctx = canvas.getContext('2d');
+        let eyeState = 'idle'; // idle, listening, speaking
+
+        function drawFace() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = "#00ffcc";
+
+            // চোখ আঁকা
+            if (eyeState === 'listening') {
+                ctx.shadowBlur = 15;
+                ctx.shadowColor = "#00ffcc";
+                ctx.beginPath();
+                ctx.arc(80, 50, 22, 0, Math.PI * 2);
+                ctx.arc(200, 50, 22, 0, Math.PI * 2);
+                ctx.fill();
+            } else {
+                ctx.shadowBlur = 5;
+                ctx.shadowColor = "#00ffcc";
+                ctx.fillRect(60, 40, 40, 20);
+                ctx.fillRect(180, 40, 40, 20);
+            }
+
+            // মুখ বা সাউন্ড ওয়েভ আঁকা
+            ctx.beginPath();
+            if (eyeState === 'speaking') {
+                ctx.lineWidth = 4;
+                ctx.strokeStyle = "#ff0055";
+                let randomHeight = Math.random() * 15 + 5;
+                ctx.moveTo(100, 95 - randomHeight);
+                ctx.lineTo(140, 95 + randomHeight);
+                ctx.lineTo(180, 95 - randomHeight);
+                ctx.stroke();
+            } else {
+                ctx.lineWidth = 3;
+                ctx.strokeStyle = "#00ffcc";
+                ctx.moveTo(100, 95);
+                ctx.lineTo(180, 95);
+                ctx.stroke();
+            }
+        }
+        setInterval(drawFace, 150);
 
         function startVoice() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
@@ -149,6 +222,7 @@
             }
             const recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
+            eyeState = 'listening';
             recognition.start();
 
             document.getElementById('reply').innerText = "শুনছি, বলুন...";
@@ -158,6 +232,10 @@
                 document.getElementById('userInput').value = text;
                 sendMsg();
             };
+
+            recognition.onend = function() {
+                eyeState = 'idle';
+            };
         }
 
         function speakText(text) {
@@ -165,6 +243,11 @@
                 window.speechSynthesis.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'bn-BD';
+                eyeState = 'speaking';
+                
+                utterance.onend = function() {
+                    eyeState = 'idle';
+                };
                 window.speechSynthesis.speak(utterance);
             }
         }
@@ -175,7 +258,7 @@
             let msg = input.value.trim();
             if(!msg) return;
 
-            replyDiv.innerText = "চিন্তা করছি...";
+            replyDiv.innerText = "প্রসেস করা হচ্ছে...";
             input.value = "";
 
             try {
@@ -184,20 +267,27 @@
                     headers: {"Content-Type": "application/json"},
                     body: JSON.stringify({
                         message: msg,
-                        history: conversationHistory
+                        user_id: "owner_voice_sample" // ব্যাকএন্ড ভয়েস বায়োমেট্রিক আইডি
                     })
                 });
 
                 let data = await res.json();
                 replyDiv.innerText = data.reply;
+                if(data.user_role) {
+                    document.getElementById('roleBadge').innerText = "ইউজার মোড: " + data.user_role;
+                }
                 speakText(data.reply);
-
-                conversationHistory.push({"role": "user", "content": msg});
-                conversationHistory.push({"role": "assistant", "content": data.reply});
 
             } catch (err) {
                 replyDiv.innerText = "সার্ভারের সাথে সংযোগ বিচ্ছিন্ন হয়েছে!";
+                eyeState = 'idle';
             }
+        }
+
+        function toggleDevice(device) {
+            // ম্যানুয়াল সুইচ সিগন্যাল হ্যান্ডলিং
+            document.getElementById('userInput').value = device + " অন অফ করো";
+            sendMsg();
         }
     </script>
 </body>
