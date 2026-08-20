@@ -63,7 +63,7 @@ def async_firebase_save(ui_action, user_msg, ai_reply):
 
 @app.route('/', methods=['GET'])
 def home():
-    return jsonify({"status": "Chitti Super Fast Direct Gemini AI Active"})
+    return jsonify({"status": "Chitti Dynamic Gemini AI Active"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -107,46 +107,50 @@ def chat():
         ]
     }
 
-    # v1beta ভার্সন এবং সঠিক মডেল নেম ব্যবহার করা হয়েছে
-    url = f"https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key={GEMINI_KEY}"
+    # একাধিক মডেলের তালিকা (একটি কাজ না করলে নিজে থেকেই অন্যটি দিয়ে চেষ্টা করবে)
+    models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    
+    reply_text = ""
+    last_error = ""
 
-    try:
-        response = requests.post(
-            url=url,
-            headers={"Content-Type": "application/json"},
-            json=payload,
-            timeout=10
-        )
+    for model_name in models:
+        url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={GEMINI_KEY}"
+        try:
+            response = requests.post(
+                url=url,
+                headers={"Content-Type": "application/json"},
+                json=payload,
+                timeout=8
+            )
+            result = response.json()
 
-        result = response.json()
+            if "candidates" in result and len(result["candidates"]) > 0:
+                reply_text = result["candidates"][0]["content"]["parts"][0]["text"]
+                break
+            elif "error" in result:
+                last_error = result["error"].get("message", "")
+        except Exception as e:
+            last_error = str(e)
+            continue
 
-        if "candidates" in result and len(result["candidates"]) > 0:
-            reply_text = result["candidates"][0]["content"]["parts"][0]["text"]
-            ui_action = {}
+    if reply_text:
+        ui_action = {}
+        if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
+            try:
+                start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
+                end_idx = reply_text.find("]]", start_idx)
+                json_str = reply_text[start_idx:end_idx].strip()
+                ui_action = json.loads(json_str)
+                reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
+            except Exception as json_err:
+                print("JSON extraction error:", json_err)
 
-            if "[[UI_ACTION:" in reply_text and "]]" in reply_text:
-                try:
-                    start_idx = reply_text.find("[[UI_ACTION:") + len("[[UI_ACTION:")
-                    end_idx = reply_text.find("]]", start_idx)
-                    json_str = reply_text[start_idx:end_idx].strip()
-                    ui_action = json.loads(json_str)
-                    reply_text = reply_text[:reply_text.find("[[UI_ACTION:")].strip()
-                except Exception as json_err:
-                    print("JSON extraction error:", json_err)
+        clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+        threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
 
-            clean_reply = reply_text.replace("*", "").replace("#", "").strip()
-
-            threading.Thread(target=async_firebase_save, args=(ui_action, msg, clean_reply)).start()
-
-            return jsonify({"reply": clean_reply})
-        elif "error" in result:
-            return jsonify({"reply": f"API এরর: {result['error'].get('message', 'অজানা সমস্যা')}"})
-        else:
-            return jsonify({"reply": "আমি কথাটি বুঝতে পারিনি, আরেকবার বলবেন?"})
-
-    except Exception as e:
-        return jsonify({"reply": f"সার্ভার এরর: {str(e)}"})
+        return jsonify({"reply": clean_reply})
+    else:
+        return jsonify({"reply": f"সমস্যা সমাধান করা সম্ভব হয়নি। এরর: {last_error}"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
-            
