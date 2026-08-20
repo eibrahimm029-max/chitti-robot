@@ -107,8 +107,8 @@ def chat():
         ]
     }
 
-    # একাধিক মডেলের তালিকা (একটি কাজ না করলে নিজে থেকেই অন্যটি দিয়ে চেষ্টা করবে)
-    models = ["gemini-2.5-flash", "gemini-1.5-flash", "gemini-1.5-pro"]
+    # গুগলের বর্তমান অফিসিয়াল সঠিক মডেলগুলোর নাম
+    models = ["gemini-1.5-flash-latest", "gemini-2.0-flash", "gemini-2.0-flash-exp"]
     
     reply_text = ""
     last_error = ""
@@ -120,7 +120,7 @@ def chat():
                 url=url,
                 headers={"Content-Type": "application/json"},
                 json=payload,
-                timeout=8
+                timeout=10
             )
             result = response.json()
 
