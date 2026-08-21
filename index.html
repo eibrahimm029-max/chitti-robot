@@ -9,11 +9,7 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body { 
             background: linear-gradient(135deg, #05050e 0%, #121225 100%); 
@@ -25,6 +21,77 @@
             align-items: center;
             justify-content: center;
             padding: 15px;
+            position: relative;
+        }
+
+        /* থ্রি-লাইনস মেনু বাটন */
+        .menu-icon {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            font-size: 26px;
+            cursor: pointer;
+            color: #00ffcc;
+            z-index: 10;
+        }
+
+        /* স্লাইড-আউট সাইডবার মেনু */
+        .sidebar {
+            height: 100%;
+            width: 0;
+            position: fixed;
+            z-index: 100;
+            top: 0;
+            left: 0;
+            background-color: rgba(10, 10, 20, 0.95);
+            backdrop-filter: blur(10px);
+            overflow-x: hidden;
+            transition: 0.4s;
+            padding-top: 60px;
+            border-right: 2px solid #00ffcc;
+            text-align: left;
+        }
+
+        .sidebar .closebtn {
+            position: absolute;
+            top: 15px;
+            right: 25px;
+            font-size: 30px;
+            color: #ff0055;
+            cursor: pointer;
+        }
+
+        .sidebar-content {
+            padding: 20px;
+        }
+
+        .sidebar h3 {
+            color: #00ffcc;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #00ffcc;
+            padding-bottom: 5px;
+        }
+
+        .reg-input {
+            width: 100%;
+            padding: 10px;
+            margin: 10px 0;
+            background: #000;
+            border: 1px solid #00ffcc;
+            color: #00ffcc;
+            border-radius: 6px;
+        }
+
+        .reg-btn {
+            width: 100%;
+            background: #00ffcc;
+            color: #000;
+            padding: 10px;
+            border: none;
+            font-weight: bold;
+            border-radius: 6px;
+            cursor: pointer;
+            margin-top: 10px;
         }
 
         .box { 
@@ -38,11 +105,7 @@
             backdrop-filter: blur(10px);
         }
 
-        h2 {
-            font-size: 22px;
-            margin-bottom: 10px;
-            text-shadow: 0 0 10px #00ffcc;
-        }
+        h2 { font-size: 22px; margin-bottom: 10px; text-shadow: 0 0 10px #00ffcc; }
 
         #robotFace {
             background: #000;
@@ -76,7 +139,6 @@
             text-align: left;
         }
 
-        /* লাইভ সেন্সর ড্যাশবোর্ড CSS */
         .sensor-container {
             display: flex;
             justify-content: space-around;
@@ -106,10 +168,7 @@
             transition: 0.3s;
         }
 
-        .switch-btn:hover {
-            background: #00ffcc;
-            color: #000;
-        }
+        .switch-btn:hover { background: #00ffcc; color: #000; }
 
         .input-group {
             display: flex; 
@@ -154,22 +213,44 @@
     </style>
 </head>
 <body>
+
+    <!-- থ্রি-লাইনস মোটন -->
+    <div class="menu-icon" onclick="openNav()">☰</div>
+
+    <!-- সাইডবার রেজিস্ট্রেশন মেনু -->
+    <div id="mySidebar" class="sidebar">
+        <span class="closebtn" onclick="closeNav()">×</span>
+        <div class="sidebar-content">
+            <h3>👤 সদস্য নিবন্ধন</h3>
+            <label>সদস্যের নাম:</label>
+            <input type="text" id="regName" class="reg-input" placeholder="যেমন: আবির">
+            
+            <label>রোল সিলেক্ট করুন:</label>
+            <select id="regRole" class="reg-input">
+                <option value="Family">Family Member</option>
+                <option value="Owner">Owner (Full Access)</option>
+            </select>
+
+            <button class="reg-btn" style="background:#ff0055; color:#fff;" onclick="recordVoiceSample()">🎙️ ভয়েস স্যাম্পল রেকর্ড করুন</button>
+            <p id="recordStatus" style="font-size:12px; margin-top:5px; color:#aaa;">ভয়েস নেওয়া হয়নি</p>
+
+            <button class="reg-btn" onclick="saveMember()">সংরক্ষণ করুন</button>
+        </div>
+    </div>
+
     <div class="box">
         <h2 id="appHeader">🤖 চিঠি এআই রোবট</h2>
         <div class="status-badge" id="roleBadge">ইউজার মোড: Guest</div>
         
-        <!-- অ্যানিমেটেড রোবট ফেস -->
         <canvas id="robotFace" width="280" height="120"></canvas>
 
         <div id="reply">আমি প্রস্তুত! আপনার নির্দেশ দিন।</div>
 
-        <!-- লাইভ সেন্সর ডাটা ড্যাশবোর্ড -->
         <div class="sensor-container">
             <div>🌡️ তাপমাত্রা: <span id="tempVal">--</span>°C</div>
             <div>🔥 গ্যাস: <span id="gasVal">স্বাভাবিক</span></div>
         </div>
 
-        <!-- ফিক্সড হোম কন্ট্রোল সুইচ -->
         <div class="switches-grid">
             <button class="switch-btn" onclick="toggleDevice('light')">💡 লাইট অন/অফ</button>
             <button class="switch-btn" onclick="toggleDevice('fan')">🌀 ফ্যান অন/অফ</button>
@@ -191,6 +272,45 @@
             firebase.initializeApp(firebaseConfig);
         }
 
+        // সাইডবার ওপেন ও ক্লোজ
+        function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
+        function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
+
+        // ভয়েস স্যাম্পল নেওয়া
+        let recordedSampleText = "";
+        function recordVoiceSample() {
+            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+            if (!SpeechRecognition) { alert("Google Chrome ব্যবহার করুন।"); return; }
+            const recognition = new SpeechRecognition();
+            recognition.lang = 'bn-BD';
+            recognition.start();
+
+            document.getElementById('recordStatus').innerText = "রেকর্ড হচ্ছে... কিছু বলুন";
+
+            recognition.onresult = function(event) {
+                recordedSampleText = event.results[0][0].transcript;
+                document.getElementById('recordStatus').innerText = "স্যাম্পল রেকর্ড সম্পন্ন!";
+            };
+        }
+
+        // নতুন ফ্যামিলি মেম্বার রেজিস্টার ও ফায়ারবেসে সেভ
+        function saveMember() {
+            let name = document.getElementById('regName').value.trim();
+            let role = document.getElementById('regRole').value;
+
+            if(!name) { alert("নাম লিখুন!"); return; }
+
+            let memberId = "user_" + Date.now();
+            firebase.database().ref('registered_members/' + memberId).set({
+                name: name,
+                role: role,
+                voice_sample: recordedSampleText
+            }).then(() => {
+                alert(name + " সফলভাবে রেজিস্টার হয়েছে!");
+                closeNav();
+            });
+        }
+
         // ফায়ারবেস থেকে লাইভ সেন্সর ডাটা পড়া
         firebase.database().ref('sensors').on('value', function(snapshot) {
             const data = snapshot.val();
@@ -201,7 +321,6 @@
         });
 
         const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
-        
         const canvas = document.getElementById('robotFace');
         const ctx = canvas.getContext('2d');
         let eyeState = 'idle';
@@ -245,10 +364,7 @@
 
         function startVoice() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) {
-                alert("Google Chrome ব্যবহার করুন।");
-                return;
-            }
+            if (!SpeechRecognition) { alert("Google Chrome ব্যবহার করুন।"); return; }
             const recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
             eyeState = 'listening';
@@ -262,9 +378,7 @@
                 sendMsg();
             };
 
-            recognition.onend = function() {
-                eyeState = 'idle';
-            };
+            recognition.onend = function() { eyeState = 'idle'; };
         }
 
         function speakText(text) {
@@ -274,9 +388,7 @@
                 utterance.lang = 'bn-BD';
                 eyeState = 'speaking';
                 
-                utterance.onend = function() {
-                    eyeState = 'idle';
-                };
+                utterance.onend = function() { eyeState = 'idle'; };
                 window.speechSynthesis.speak(utterance);
             }
         }
