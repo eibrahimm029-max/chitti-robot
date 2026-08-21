@@ -3,14 +3,13 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title id="pageTitle">চিঠি এআই রোবট - সুপার কন্ট্রোল</title>
+    <title>চিঠি এআই রোবট - সুপার সিকিউরড সিস্টেম</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
 
     <style>
         * { box-sizing: border-box; margin: 0; padding: 0; }
-
         body { 
             background: linear-gradient(135deg, #05050e 0%, #121225 100%); 
             color: #00ffcc; 
@@ -23,228 +22,92 @@
             padding: 15px;
             position: relative;
         }
-
-        /* থ্রি-লাইনস মেনু বাটন */
-        .menu-icon {
-            position: absolute;
-            top: 20px;
-            left: 20px;
-            font-size: 26px;
-            cursor: pointer;
-            color: #00ffcc;
-            z-index: 10;
-        }
-
-        /* স্লাইড-আউট সাইডবার মেনু */
+        .menu-icon { position: absolute; top: 20px; left: 20px; font-size: 26px; cursor: pointer; color: #00ffcc; z-index: 10; }
         .sidebar {
-            height: 100%;
-            width: 0;
-            position: fixed;
-            z-index: 100;
-            top: 0;
-            left: 0;
-            background-color: rgba(10, 10, 20, 0.95);
-            backdrop-filter: blur(10px);
-            overflow-x: hidden;
-            transition: 0.4s;
-            padding-top: 60px;
-            border-right: 2px solid #00ffcc;
-            text-align: left;
+            height: 100%; width: 0; position: fixed; z-index: 100; top: 0; left: 0;
+            background-color: rgba(10, 10, 20, 0.95); backdrop-filter: blur(10px);
+            overflow-x: hidden; transition: 0.4s; padding-top: 60px; border-right: 2px solid #00ffcc; text-align: left;
         }
+        .sidebar .closebtn { position: absolute; top: 15px; right: 25px; font-size: 30px; color: #ff0055; cursor: pointer; }
+        .sidebar-content { padding: 20px; }
+        .reg-input { width: 100%; padding: 10px; margin: 10px 0; background: #000; border: 1px solid #00ffcc; color: #00ffcc; border-radius: 6px; }
+        .reg-btn { width: 100%; background: #00ffcc; color: #000; padding: 10px; border: none; font-weight: bold; border-radius: 6px; cursor: pointer; margin-top: 10px; }
+        
+        .notification-card {
+            display: none; background: rgba(255, 0, 85, 0.2); border: 2px solid #ff0055;
+            border-radius: 12px; padding: 12px; margin: 10px 0; color: #fff; box-shadow: 0 0 15px rgba(255, 0, 85, 0.4);
+        }
+        .notif-btn-group { display: flex; gap: 10px; justify-content: center; margin-top: 10px; }
+        .btn-confirm { background: #00ffcc; color: #000; padding: 6px 12px; border: none; border-radius: 5px; font-weight: bold; cursor: pointer; }
+        .btn-cancel { background: #555; color: #fff; padding: 6px 12px; border: none; border-radius: 5px; cursor: pointer; }
 
-        .sidebar .closebtn {
-            position: absolute;
-            top: 15px;
-            right: 25px;
-            font-size: 30px;
-            color: #ff0055;
-            cursor: pointer;
+        .shutdown-banner {
+            display: none; background: #ff0055; color: #fff; padding: 10px; border-radius: 8px; margin-bottom: 10px; font-weight: bold; animation: blink 1s infinite;
         }
-
-        .sidebar-content {
-            padding: 20px;
-        }
-
-        .sidebar h3 {
-            color: #00ffcc;
-            margin-bottom: 15px;
-            border-bottom: 1px solid #00ffcc;
-            padding-bottom: 5px;
-        }
-
-        .reg-input {
-            width: 100%;
-            padding: 10px;
-            margin: 10px 0;
-            background: #000;
-            border: 1px solid #00ffcc;
-            color: #00ffcc;
-            border-radius: 6px;
-        }
-
-        .reg-btn {
-            width: 100%;
-            background: #00ffcc;
-            color: #000;
-            padding: 10px;
-            border: none;
-            font-weight: bold;
-            border-radius: 6px;
-            cursor: pointer;
-            margin-top: 10px;
-        }
+        @keyframes blink { 50% { opacity: 0.5; } }
 
         .box { 
-            border: 2px solid rgba(0, 255, 204, 0.3); 
-            padding: 20px; 
-            border-radius: 20px; 
-            width: 100%;
-            max-width: 450px; 
-            box-shadow: 0 0 30px rgba(0, 255, 204, 0.15); 
-            background: rgba(16, 16, 26, 0.85); 
-            backdrop-filter: blur(10px);
+            border: 2px solid rgba(0, 255, 204, 0.3); padding: 20px; border-radius: 20px; 
+            width: 100%; max-width: 450px; box-shadow: 0 0 30px rgba(0, 255, 204, 0.15); 
+            background: rgba(16, 16, 26, 0.85); backdrop-filter: blur(10px);
         }
-
         h2 { font-size: 22px; margin-bottom: 10px; text-shadow: 0 0 10px #00ffcc; }
-
-        #robotFace {
-            background: #000;
-            border: 2px solid #00ffcc;
-            border-radius: 15px;
-            margin: 10px auto;
-            display: block;
-            box-shadow: inset 0 0 15px rgba(0, 255, 204, 0.4);
-        }
-
-        .status-badge {
-            display: inline-block;
-            padding: 4px 12px;
-            border-radius: 12px;
-            font-size: 12px;
-            background: rgba(0, 255, 204, 0.1);
-            border: 1px solid #00ffcc;
-            margin-bottom: 10px;
-        }
-
-        #reply { 
-            margin: 10px 0; 
-            min-height: 55px; 
-            font-size: 15px; 
-            line-height: 1.5; 
-            color: #ffffff; 
-            background: rgba(0, 0, 0, 0.6);
-            padding: 12px;
-            border-radius: 10px;
-            border-left: 3px solid #00ffcc;
-            text-align: left;
-        }
-
-        .sensor-container {
-            display: flex;
-            justify-content: space-around;
-            background: rgba(0, 0, 0, 0.5);
-            padding: 10px;
-            border-radius: 10px;
-            border: 1px solid #00ffcc;
-            margin: 10px 0;
-            font-size: 14px;
-        }
-
-        .switches-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            gap: 10px;
-            margin: 15px 0;
-        }
-
-        .switch-btn {
-            background: #18182a;
-            border: 1px solid #00ffcc;
-            color: #00ffcc;
-            padding: 10px;
-            border-radius: 8px;
-            font-weight: bold;
-            cursor: pointer;
-            transition: 0.3s;
-        }
-
+        #robotFace { background: #000; border: 2px solid #00ffcc; border-radius: 15px; margin: 10px auto; display: block; box-shadow: inset 0 0 15px rgba(0, 255, 204, 0.4); }
+        .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; background: rgba(0, 255, 204, 0.1); border: 1px solid #00ffcc; margin-bottom: 10px; }
+        #reply { margin: 10px 0; min-height: 55px; font-size: 15px; line-height: 1.5; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 12px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
+        .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 14px; }
+        .switches-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
+        .switch-btn { background: #18182a; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
         .switch-btn:hover { background: #00ffcc; color: #000; }
-
-        .input-group {
-            display: flex; 
-            justify-content: center; 
-            align-items: center; 
-            gap: 8px;
-            margin-top: 10px;
-        }
-
-        input[type="text"] { 
-            background: #000; 
-            border: 1px solid #00ffcc; 
-            color: #00ffcc; 
-            padding: 10px; 
-            flex: 1;
-            border-radius: 8px; 
-            outline: none; 
-            font-size: 14px; 
-        }
-
-        .send-btn { 
-            background: #00ffcc; 
-            color: #000; 
-            border: none; 
-            padding: 10px 15px; 
-            font-weight: bold; 
-            cursor: pointer; 
-            border-radius: 8px; 
-        }
-
-        .mic-btn { 
-            background: #ff0055; 
-            color: white; 
-            border: none;
-            border-radius: 50%; 
-            width: 40px; 
-            height: 40px; 
-            cursor: pointer;
-            box-shadow: 0 0 10px #ff0055;
-            font-size: 16px;
-        }
+        .input-group { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
+        input[type="text"] { background: #000; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; flex: 1; border-radius: 8px; outline: none; font-size: 14px; }
+        .send-btn { background: #00ffcc; color: #000; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 8px; }
+        .mic-btn { background: #ff0055; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; box-shadow: 0 0 10px #ff0055; font-size: 16px; }
+        #audioPlayerContainer { margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
 
-    <!-- থ্রি-লাইনস মোটন -->
     <div class="menu-icon" onclick="openNav()">☰</div>
 
-    <!-- সাইডবার রেজিস্ট্রেশন মেনু -->
     <div id="mySidebar" class="sidebar">
         <span class="closebtn" onclick="closeNav()">×</span>
         <div class="sidebar-content">
-            <h3>👤 সদস্য নিবন্ধন</h3>
+            <h3 style="color:#00ffcc; margin-bottom:10px;">👤 সদস্য নিবন্ধন</h3>
             <label>সদস্যের নাম:</label>
             <input type="text" id="regName" class="reg-input" placeholder="যেমন: আবির">
-            
             <label>রোল সিলেক্ট করুন:</label>
             <select id="regRole" class="reg-input">
                 <option value="Family">Family Member</option>
                 <option value="Owner">Owner (Full Access)</option>
             </select>
-
-            <button class="reg-btn" style="background:#ff0055; color:#fff;" onclick="recordVoiceSample()">🎙️ ভয়েস স্যাম্পল রেকর্ড করুন</button>
+            <button class="reg-btn" style="background:#ff0055; color:#fff;" onclick="recordAudioBlob()">🎙️ ভয়েস স্যাম্পল রেকর্ড</button>
             <p id="recordStatus" style="font-size:12px; margin-top:5px; color:#aaa;">ভয়েস নেওয়া হয়নি</p>
-
-            <button class="reg-btn" onclick="saveMember()">সংরক্ষণ করুন</button>
+            <button class="reg-btn" onclick="saveMemberWithStorage()">সংরক্ষণ করুন</button>
         </div>
     </div>
 
     <div class="box">
-        <h2 id="appHeader">🤖 চিঠি এআই রোবট</h2>
+        <h2>🤖 চিঠি এআই রোবট</h2>
         <div class="status-badge" id="roleBadge">ইউজার মোড: Guest</div>
         
+        <div id="shutdownBanner" class="shutdown-banner">🚨 সাইবার সিকিউরিটি অ্যালার্ট: রোবট শাটডাউন মোডে আছে!</div>
+
         <canvas id="robotFace" width="280" height="120"></canvas>
 
-        <div id="reply">আমি প্রস্তুত! আপনার নির্দেশ দিন।</div>
+        <div class="notification-card" id="autoCleanupNotif">
+            <p id="notifText">🔔 পুরোনো কিছু ডাটা জমা হয়েছে। ডিলিট করব?</p>
+            <div class="notif-btn-group">
+                <button class="btn-confirm" onclick="confirmDeleteOldData(true)">হ্যাঁ</button>
+                <button class="btn-cancel" onclick="confirmDeleteOldData(false)">না</button>
+            </div>
+        </div>
+
+        <div id="reply">আমি প্রস্তুত! নির্দেশ দিন অথবা গান বাজাতে বলুন।</div>
+
+        <div id="audioPlayerContainer">
+            <audio id="robotAudioPlayer" controls style="width: 100%; border-radius: 8px;"></audio>
+        </div>
 
         <div class="sensor-container">
             <div>🌡️ তাপমাত্রা: <span id="tempVal">--</span>°C</div>
@@ -257,61 +120,86 @@
         </div>
 
         <div class="input-group">
-            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা ভয়েস দিন...">
+            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা বলুন (যেমন: গান বাজাও)...">
             <button class="send-btn" onclick="sendMsg()">পাঠান</button>
             <button class="mic-btn" onclick="startVoice()">🎤</button>
         </div>
     </div>
 
     <script>
-        const firebaseConfig = {
-            databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com"
-        };
+        const firebaseConfig = { databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com" };
+        if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 
-        if (!firebase.apps.length) {
-            firebase.initializeApp(firebaseConfig);
-        }
-
-        // সাইডবার ওপেন ও ক্লোজ
         function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
         function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
 
-        // ভয়েস স্যাম্পল নেওয়া
-        let recordedSampleText = "";
-        function recordVoiceSample() {
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("Google Chrome ব্যবহার করুন।"); return; }
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'bn-BD';
-            recognition.start();
+        // ইমার্জেন্সি শাটডাউন স্ট্যাটাস মনিটরিং
+        firebase.database().ref('system_status/emergency_shutdown').on('value', function(snapshot) {
+            const isShutdown = snapshot.val();
+            const banner = document.getElementById('shutdownBanner');
+            if (isShutdown === true) {
+                banner.style.display = "block";
+                document.getElementById('reply').innerText = "⚠️ সাইবার আক্রমণের কারণে সিস্টেম নিরাপত্তা লক চালু হয়েছে।";
+            } else {
+                banner.style.display = "none";
+            }
+        });
 
-            document.getElementById('recordStatus').innerText = "রেকর্ড হচ্ছে... কিছু বলুন";
+        firebase.database().ref('system_alerts/old_data_notice').on('value', function(snapshot) {
+            const notice = snapshot.val();
+            const notifCard = document.getElementById('autoCleanupNotif');
+            if (notice && notice.status === "pending") {
+                document.getElementById('notifText').innerText = "🔔 " + notice.message;
+                notifCard.style.display = "block";
+            } else {
+                notifCard.style.display = "none";
+            }
+        });
 
-            recognition.onresult = function(event) {
-                recordedSampleText = event.results[0][0].transcript;
-                document.getElementById('recordStatus').innerText = "স্যাম্পল রেকর্ড সম্পন্ন!";
-            };
+        function confirmDeleteOldData(isApproved) {
+            if (isApproved) { sendMsgDirect("পুরোনো অব্যবহৃত ডাটাগুলো ডিলিট করে দাও"); }
+            firebase.database().ref('system_alerts/old_data_notice').update({ status: "dismissed" });
+            document.getElementById('autoCleanupNotif').style.display = "none";
         }
 
-        // নতুন ফ্যামিলি মেম্বার রেজিস্টার ও ফায়ারবেসে সেভ
-        function saveMember() {
+        let mediaRecorder;
+        let audioChunks = [];
+        let audioBase64Data = "";
+
+        async function recordAudioBlob() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorder = new MediaRecorder(stream);
+                audioChunks = [];
+                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
+                mediaRecorder.onstop = () => {
+                    const blob = new Blob(audioChunks, { type: 'audio/wav' });
+                    const reader = new FileReader();
+                    reader.readAsDataURL(blob);
+                    reader.onloadend = () => {
+                        audioBase64Data = reader.result;
+                        document.getElementById('recordStatus').innerText = "ভয়েস স্যাম্পল সংরক্ষিত!";
+                    };
+                };
+                mediaRecorder.start();
+                document.getElementById('recordStatus').innerText = "রেকর্ড হচ্ছে...";
+                setTimeout(() => { mediaRecorder.stop(); }, 3000);
+            } catch (err) { alert("মাইক্রোফোন পারমিশন দিন!"); }
+        }
+
+        function saveMemberWithStorage() {
             let name = document.getElementById('regName').value.trim();
             let role = document.getElementById('regRole').value;
-
-            if(!name) { alert("নাম লিখুন!"); return; }
+            if(!name || !audioBase64Data) { alert("নাম ও ভয়েস স্যাম্পল দিন!"); return; }
 
             let memberId = "user_" + Date.now();
-            firebase.database().ref('registered_members/' + memberId).set({
-                name: name,
-                role: role,
-                voice_sample: recordedSampleText
-            }).then(() => {
-                alert(name + " সফলভাবে রেজিস্টার হয়েছে!");
+            firebase.database().ref('registered_members/' + memberId).set({ name: name, role: role, has_voice: true });
+            firebase.database().ref('voice_storage/' + memberId).set({ audio_data: audioBase64Data }).then(() => {
+                alert(name + " সফলভাবে রেজিস্টার হয়েছে!");
                 closeNav();
             });
         }
 
-        // ফায়ারবেস থেকে লাইভ সেন্সর ডাটা পড়া
         firebase.database().ref('sensors').on('value', function(snapshot) {
             const data = snapshot.val();
             if (data) {
@@ -328,56 +216,38 @@
         function drawFace() {
             ctx.clearRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = "#00ffcc";
-
             if (eyeState === 'listening') {
-                ctx.shadowBlur = 15;
-                ctx.shadowColor = "#00ffcc";
-                ctx.beginPath();
-                ctx.arc(80, 50, 22, 0, Math.PI * 2);
-                ctx.arc(200, 50, 22, 0, Math.PI * 2);
-                ctx.fill();
+                ctx.shadowBlur = 15; ctx.shadowColor = "#00ffcc";
+                ctx.beginPath(); ctx.arc(80, 50, 22, 0, Math.PI * 2); ctx.arc(200, 50, 22, 0, Math.PI * 2); ctx.fill();
             } else {
-                ctx.shadowBlur = 5;
-                ctx.shadowColor = "#00ffcc";
-                ctx.fillRect(60, 40, 40, 20);
-                ctx.fillRect(180, 40, 40, 20);
+                ctx.shadowBlur = 5; ctx.shadowColor = "#00ffcc";
+                ctx.fillRect(60, 40, 40, 20); ctx.fillRect(180, 40, 40, 20);
             }
-
             ctx.beginPath();
             if (eyeState === 'speaking') {
-                ctx.lineWidth = 4;
-                ctx.strokeStyle = "#ff0055";
-                let randomHeight = Math.random() * 15 + 5;
-                ctx.moveTo(100, 95 - randomHeight);
-                ctx.lineTo(140, 95 + randomHeight);
-                ctx.lineTo(180, 95 - randomHeight);
-                ctx.stroke();
+                ctx.lineWidth = 4; ctx.strokeStyle = "#ff0055";
+                let h = Math.random() * 15 + 5;
+                ctx.moveTo(100, 95 - h); ctx.lineTo(140, 95 + h); ctx.lineTo(180, 95 - h); ctx.stroke();
             } else {
-                ctx.lineWidth = 3;
-                ctx.strokeStyle = "#00ffcc";
-                ctx.moveTo(100, 95);
-                ctx.lineTo(180, 95);
-                ctx.stroke();
+                ctx.lineWidth = 3; ctx.strokeStyle = "#00ffcc";
+                ctx.moveTo(100, 95); ctx.lineTo(180, 95); ctx.stroke();
             }
         }
         setInterval(drawFace, 150);
 
         function startVoice() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("Google Chrome ব্যবহার করুন।"); return; }
+            if (!SpeechRecognition) { alert("ব্রাউজার সাপোর্ট করে না।"); return; }
             const recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
             eyeState = 'listening';
             recognition.start();
-
-            document.getElementById('reply').innerText = "শুনছি, বলুন...";
+            document.getElementById('reply').innerText = "শুনছি...";
 
             recognition.onresult = function(event) {
-                let text = event.results[0][0].transcript;
-                document.getElementById('userInput').value = text;
+                document.getElementById('userInput').value = event.results[0][0].transcript;
                 sendMsg();
             };
-
             recognition.onend = function() { eyeState = 'idle'; };
         }
 
@@ -387,10 +257,14 @@
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'bn-BD';
                 eyeState = 'speaking';
-                
                 utterance.onend = function() { eyeState = 'idle'; };
                 window.speechSynthesis.speak(utterance);
             }
+        }
+
+        async function sendMsgDirect(txt) {
+            document.getElementById('userInput').value = txt;
+            sendMsg();
         }
 
         async function sendMsg() {
@@ -399,17 +273,14 @@
             let msg = input.value.trim();
             if(!msg) return;
 
-            replyDiv.innerText = "প্রসেস করা হচ্ছে...";
+            replyDiv.innerText = "প্রসেস হচ্ছে...";
             input.value = "";
 
             try {
                 let res = await fetch(SERVER_URL, {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({
-                        message: msg,
-                        user_id: "owner_voice_sample"
-                    })
+                    body: JSON.stringify({ message: msg, user_id: "owner" })
                 });
 
                 let data = await res.json();
@@ -417,17 +288,24 @@
                 if(data.user_role) {
                     document.getElementById('roleBadge').innerText = "ইউজার মোড: " + data.user_role;
                 }
-                speakText(data.reply);
+                
+                if (data.audio_url) {
+                    let playerContainer = document.getElementById('audioPlayerContainer');
+                    let player = document.getElementById('robotAudioPlayer');
+                    player.src = data.audio_url;
+                    playerContainer.style.display = "block";
+                    player.play();
+                }
 
+                speakText(data.reply);
             } catch (err) {
-                replyDiv.innerText = "সার্ভারের সাথে সংযোগ বিচ্ছিন্ন হয়েছে!";
+                replyDiv.innerText = "সার্ভার সংযোগ বিচ্ছিন্ন!";
                 eyeState = 'idle';
             }
         }
 
         function toggleDevice(device) {
-            document.getElementById('userInput').value = device + " অন অফ করো";
-            sendMsg();
+            sendMsgDirect(device + " অন অফ করো");
         }
     </script>
 </body>
