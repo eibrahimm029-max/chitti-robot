@@ -1,12 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os
-import requests
-import json
-import threading
-import time
+import os, requests, json, time, random
 import firebase_admin
-from firebase_admin import credentials, db
+from firebase_admin import credentials, db, firestore
 
 app = Flask(__name__)
 CORS(app)
@@ -15,160 +11,125 @@ OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
 FIREBASE_CREDS = (os.environ.get("FIREBASE_CREDENTIALS_JSON") or os.environ.get("FIREBASE_CRED") or "").strip()
 
+# ফায়ারবেস ও ফায়ারস্টোর ইনিশিয়ালাইজেশন
+db_firestore = None
 if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     try:
         cred_dict = json.loads(FIREBASE_CREDS)
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_URL})
-        print("Firebase Connected Successfully!")
+        db_firestore = firestore.client() # Firestore Client
+        print("Firebase & Firestore Connected Successfully!")
     except Exception as e:
         print("Firebase Init Error:", e)
 
-# ----------------- সাইবার সেলফ-ডিফেন্স ও স্প্যাম ফিল্টার -----------------
-request_history = {}
+pending_challenges = {}
+is_voice_recording_active = False
 
-def detect_cyber_attack(client_ip):
-    current_time = time.time()
-    if client_ip not in request_history:
-        request_history[client_ip] = []
-    
-    # শেষ ৫ সেকেন্ডের রিকোয়েস্ট হিসাব করা
-    request_history[client_ip] = [t for t in request_history[client_ip] if current_time - t < 5]
-    request_history[client_ip].append(current_time)
+# ----------------- ফায়ারস্টোরে অরিজিনাল ভয়েস ফাইল সেভ -----------------
+def save_voice_to_firestore(user_id, raw_audio_data):
+    """
+    কোনো টেক্সট রূপান্তর ছাড়া সরাসরি রিয়েল অডিও ডাটা ফায়ারস্টোরে জমা করবে
+    """
+    if not is_voice_recording_active or not raw_audio_data or not db_firestore:
+        return
 
-    # ৫ সেকেন্ডে ১০টির বেশি রিকোয়েস্ট আসলে অ্যাটাক হিসেবে চিহ্নিত হবে
-    if len(request_history[client_ip]) > 10:
-        if firebase_admin._apps:
-            # ফায়ারবেসে ইমার্জেন্সি শাটডাউন ফ্ল্যাগ পাঠানো
-            db.reference('/system_status').update({
-                "emergency_shutdown": True,
-                "reason": "Cyber Attack Detected",
-                "blocked_ip": client_ip,
-                "timestamp": str(int(current_time))
-            })
-        return True
-    return False
-# -------------------------------------------------------------------
-
-def authenticate_user_voice(user_id, current_voice_sample=""):
-    if not firebase_admin._apps:
-        return "Owner"
     try:
-        registered_members = db.reference('/registered_members').get() or {}
-        voice_files = db.reference('/voice_storage').get() or {}
-
-        for m_id, member in registered_members.items():
-            member_audio = voice_files.get(m_id, {}).get("audio_data", "")
-            if member_audio and member_audio in current_voice_sample:
-                return member.get("role", "Family")
-            
-        if user_id in registered_members:
-            return registered_members[user_id].get("role", "Family")
+        current_time = time.strftime("%Y-%m-%d_%H-%M-%S")
+        doc_ref = db_firestore.collection('voice_recordings').document(f"{user_id}_{current_time}")
+        doc_ref.set({
+            "speaker_id": user_id,
+            "timestamp": current_time,
+            "audio_file_data": raw_audio_data, # আসল রিয়েল অডিও ফাইল ডাটা
+            "format": "audio/wav"
+        })
     except Exception as e:
-        print("Auth Error:", e)
-    return "Owner"
+        print("Firestore Save Error:", e)
 
-def delete_firebase_data(target_path):
-    if not firebase_admin._apps: return False
-    try:
-        db.reference(target_path).delete()
-        return True
-    except Exception as e:
-        return False
+# ----------------- ডিভাইস ও সুইচ লজিক -----------------
+DEVICE_MAP = {"লাইট": "light", "light": "light", "ফ্যান": "fan", "fan": "fan", "টিভি": "tv", "tv": "tv", "ফ্রিজ": "fridge", "fridge": "fridge"}
 
-# ২৪ ঘণ্টার পুরোনো ডাটা স্ক্যানার
-def auto_check_old_data():
-    while True:
-        try:
-            if firebase_admin._apps:
-                chat_data = db.reference('/chat_history').get()
-                if chat_data:
-                    current_time = time.time()
-                    old_count = sum(1 for k, v in chat_data.items() if (current_time - float(v.get("timestamp", current_time))) > 86400)
-                    if old_count > 0:
-                        db.reference('/system_alerts/old_data_notice').set({
-                            "status": "pending",
-                            "message": f"আপনার {old_count}টি চ্যাট হিস্ট্রি ২৪ ঘণ্টার বেশি পুরোনো। মুছে ফেলব?",
-                            "timestamp": str(int(current_time))
-                        })
-        except Exception:
-            pass
-        time.sleep(3600)
+def quick_device_control(msg, user_role):
+    msg_lower = msg.lower()
+    is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও"])
+    is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও"])
+    if not (is_on or is_off): return None
 
-threading.Thread(target=auto_check_old_data, daemon=True).start()
+    target_device = None
+    for key, device in DEVICE_MAP.items():
+        if key in msg_lower:
+            target_device = device
+            break
 
-@app.route('/', methods=['GET'])
-def home():
-    return jsonify({"status": "Chitti AI Robot Core System Active"})
+    if not target_device: return None
 
+    status = "ON" if is_on else "OFF"
+    if firebase_admin._apps:
+        db.reference(f'/devices/{target_device}').set(status)
+
+    return f"ঠিক আছে, {target_device.upper()} {status} করা হলো।"
+
+# ----------------- চ্যাট রাউট -----------------
 @app.route('/chat', methods=['POST'])
 def chat():
-    client_ip = request.remote_addr
-    
-    # সাইবার অ্যাটাক পরীক্ষা
-    if detect_cyber_attack(client_ip):
-        return jsonify({
-            "reply": "⚠️ সাইবার অ্যাটাক সনাক্ত হয়েছে! নিরাপত্তার জন্য রোবট স্বয়ংক্রিয়ভাবে শাটডাউন মোডে চলে গেছে।",
-            "status": "SHUTDOWN"
-        }), 403
-
+    global is_voice_recording_active
     data = request.json or {}
     msg = data.get("message", "").strip()
-    user_id = data.get("user_id", "guest")
-    voice_sample = data.get("voice_sample", "")
+    user_id = data.get("user_id", "owner")
+    raw_audio_data = data.get("audio_data", "") # ফ্রন্টএন্ড/রোবট থেকে আসা সরাসরি অডিও
 
-    if not msg: return jsonify({"reply": "নির্দেশ দিন।"})
-    if not OPENROUTER_KEY: return jsonify({"reply": "API Key পাওয়া যায়নি!"})
+    # ১. কথা টেক্সট না করে সরাসরি অরিজিনাল অডিও ফায়ারস্টোরে সেভ
+    if raw_audio_data:
+        save_voice_to_firestore(user_id, raw_audio_data)
 
-    user_role = authenticate_user_voice(user_id, voice_sample if voice_sample else msg)
-
-    # ১. গান/অডিও প্লে করার নির্দেশ
-    music_keywords = ["গান", "সংগীত", "অডিও", "music", "song", "play"]
-    if any(kw in msg.lower() for kw in music_keywords):
-        sample_audio_url = "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
-        return jsonify({
-            "reply": "আপনার জন্য গান বাজাচ্ছি...",
-            "audio_url": sample_audio_url,
-            "user_role": user_role
-        })
-
-    # ২. নিরাপদ নির্দিষ্ট ডাটা ডিলিট লজিক
-    delete_keywords = ["ডিলিট", "মুছে", "সাফ", "রিমুভ", "কাটো", "ক্লিয়ার"]
-    if any(word in msg.lower() for word in delete_keywords):
-        if user_role != "Owner":
-            return jsonify({"reply": "দুঃখিত, ওনার পারমিশন ছাড়া ডাটা মোছা যাবে না।", "user_role": user_role})
-        else:
-            if any(w in msg.lower() for w in ["চ্যাট", "কথা", "হিস্ট্রি", "মেসেজ", "পুরোনো"]):
-                delete_firebase_data('/chat_history')
-                return jsonify({"reply": "পুরোনো চ্যাট হিস্ট্রি সফলভাবে মুছে ফেলা হয়েছে।", "user_role": user_role})
-            elif any(w in msg.lower() for w in ["কমান্ড", "আদেশ"]):
-                delete_firebase_data('/commands')
-                return jsonify({"reply": "পুরোনো কমান্ডগুলো ডিলিট করা হয়েছে।", "user_role": user_role})
-            else:
-                return jsonify({"reply": "নির্দিষ্ট কোন ডাটা মুছতে চান (যেমন: চ্যাট হিস্ট্রি)?", "user_role": user_role})
-
-    # ৩. এআই রেসপন্স (আজীবন ফ্রি রাউটার ব্যবহার করা হয়েছে)
-    system_prompt = f"আপনি 'চিঠি রোবট'। বর্তমান ইউজার: {user_role}. প্রমিত বাংলায় সংক্ষেপে উত্তর দিন। স্টার (*) বা হ্যাশ ব্যবহার করবেন না।"
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_KEY}",
-        "Content-Type": "application/json",
-        "HTTP-Referer": "https://github.com",
-        "X-Title": "Chitti Robot"
-    }
+    # ২. সারাদিনের রেকর্ড কন্ট্রোল
+    if "সারাদিনের কথা রেকর্ড করো" in msg or "রেকর্ড অন করো" in msg:
+        is_voice_recording_active = True
+        return jsonify({"reply": "সারাদিনের সরাসরি অরিজিনাল ভয়েস রেকর্ড মোড চালু হলো। ফায়ারস্টোরে ডাটা জমা হচ্ছে।"})
     
-    payload = {
-        "model": "openrouter/free",
-        "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": msg}]
-    }
+    if "রেকর্ড বন্ধ করো" in msg or "রেকর্ড অফ করো" in msg:
+        is_voice_recording_active = False
+        return jsonify({"reply": "ভয়েস রেকর্ড মোড বন্ধ করা হয়েছে।"})
+
+    # ৩. দ্রুত ডিভাইস সুইচ
+    fast_device_reply = quick_device_control(msg, "Owner")
+    if fast_device_reply:
+        return jsonify({"reply": fast_device_reply})
+
+    # ৪. সিকিউরিটি কোড ও ডিলিট ফিল্টার
+    if user_id in pending_challenges:
+        if pending_challenges[user_id] in msg:
+            del pending_challenges[user_id]
+            if firebase_admin._apps: db.reference('/chat_history').delete()
+            return jsonify({"reply": "ওনার ভেরিফিকেশন সফল! চ্যাট হিস্ট্রি মুছে ফেলা হয়েছে।"})
+        else:
+            return jsonify({"reply": "ভুল পিন কোড!"})
+
+    if any(word in msg.lower() for word in ["ডিলিট", "মুছে", "সাফ", "কাটো"]):
+        if any(w in msg.lower() for w in ["হিসাব", "সিস্টেম", "ডাটাবেজ"]):
+            return jsonify({"reply": "সিস্টেম বা হিসাবের ডাটা মোছা যাবে না।"})
+
+        if any(w in msg.lower() for w in ["চ্যাট", "মেসেজ", "কথা"]):
+            random_pin = str(random.randint(1000, 9999))
+            pending_challenges[user_id] = random_pin
+            return jsonify({"reply": f"প্রাইভেসি পিন কোডটি বলুন: {random_pin}", "challenge_code": random_pin})
+
+    # ৫. এআই রেসপন্স
+    if not OPENROUTER_KEY: return jsonify({"reply": "API Key নেই!"})
+
+    system_prompt = "আপনি 'চিঠি'। সর্বোচ্চ ১০ শব্দে সংক্ষেপে প্রমিত বাংলায় উত্তর দিন।"
+    headers = {"Authorization": f"Bearer {OPENROUTER_KEY}", "Content-Type": "application/json", "HTTP-Referer": "https://github.com"}
+    payload = {"model": "openrouter/free", "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": msg}], "max_tokens": 50}
 
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=12)
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=5)
         result = response.json()
-        reply_text = result["choices"][0]["message"]["content"] if "choices" in result else "দুঃখিত, বুঝতে পারিনি।"
+        reply_text = result["choices"][0]["message"]["content"] if "choices" in result else "বুঝতে পারিনি।"
         clean_reply = reply_text.replace("*", "").replace("#", "").strip()
-        return jsonify({"reply": clean_reply, "user_role": user_role})
-    except Exception as e:
-        return jsonify({"reply": "সার্ভার এরর হয়েছে।"})
+        return jsonify({"reply": clean_reply})
+    except Exception:
+        return jsonify({"reply": "সংযোগের সমস্যা হয়েছে।"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
+        
