@@ -147,12 +147,17 @@ def chat():
             else:
                 return jsonify({"reply": "নির্দিষ্ট কোন ডাটা মুছতে চান (যেমন: চ্যাট হিস্ট্রি)?", "user_role": user_role})
 
-    # ৩. এআই রেসপন্স
+    # ৩. এআই রেসপন্স (আজীবন ফ্রি রাউটার ব্যবহার করা হয়েছে)
     system_prompt = f"আপনি 'চিঠি রোবট'। বর্তমান ইউজার: {user_role}. প্রমিত বাংলায় সংক্ষেপে উত্তর দিন। স্টার (*) বা হ্যাশ ব্যবহার করবেন না।"
-    headers = {"Authorization": f"Bearer {OPENROUTER_KEY}", "Content-Type": "application/json"}
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}",
+        "Content-Type": "application/json",
+        "HTTP-Referer": "https://github.com",
+        "X-Title": "Chitti Robot"
+    }
     
     payload = {
-        "model": "google/gemma-2-9b-it:free",
+        "model": "openrouter/free",
         "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": msg}]
     }
 
