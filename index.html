@@ -1,9 +1,9 @@
-<!DOCTYPE html>
+ll<!DOCTYPE html>
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি এআই রোবট - স্মার্ট হোম</title>
+    <title>চিঠি এআই রোবট - স্মার্ট হোম অটোমেশন</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -33,7 +33,7 @@
         
         .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 13px; }
         
-        /* আধুনিক টগল সুইচ কার্ড ডিজাইন */
+        /* মোবাইল স্টাইল টগল সুইচ কার্ড */
         .switches-list { display: flex; flex-direction: column; gap: 10px; margin: 15px 0; }
         .switch-card {
             background: rgba(24, 24, 42, 0.8);
@@ -48,7 +48,7 @@
         .switch-card:hover { border-color: #00ffcc; box-shadow: 0 0 10px rgba(0, 255, 204, 0.2); }
         .switch-label { font-size: 14px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 8px; }
 
-        /* স্ক্রিনশটের মতো মোবাইল স্টাইল টগল সুইচ */
+        /* টগল স্লাইডার ডিজাইন */
         .toggle-switch {
             position: relative;
             display: inline-block;
@@ -93,20 +93,18 @@
     <div class="box">
         <h2>🤖 চিঠি এআই রোবট</h2>
         <canvas id="robotFace" width="260" height="80"></canvas>
-        <div id="reply">আমি প্রস্তুত! নির্দেশ দিন বা সুইচ অন-অফ করুন।</div>
+        <div id="reply">আমি প্রস্তুত! নির্দেশ দিন বা প্রশ্ন করুন।</div>
 
         <div class="sensor-container">
             <div>🌡️ তাপমাত্রা: <span id="tempVal">--</span>°C</div>
             <div>🔥 গ্যাস: <span id="gasVal">স্বাভাবিক</span></div>
         </div>
 
-        <!-- ৮টি আধুনিক টগল সুইচ বাটন লিস্ট -->
-        <div class="switches-list" id="switchesList">
-            <!-- জাভাস্ক্রিপ্ট দিয়ে ৮টি সুইচ জেনারেট হবে -->
-        </div>
+        <!-- ৮টি রিলে বাটন লিস্ট -->
+        <div class="switches-list" id="switchesList"></div>
 
         <div class="input-group">
-            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা বলুন..." onkeypress="if(event.key==='Enter') sendMsg()">
+            <input type="text" id="userInput" placeholder="কমান্ড দিন বা কিছু জিজ্ঞেস করুন..." onkeypress="if(event.key==='Enter') sendMsg()">
             <button class="send-btn" onclick="sendMsg()">পাঠান</button>
             <button class="mic-btn" onclick="startVoice()">🎤</button>
         </div>
@@ -116,16 +114,16 @@
         const firebaseConfig = { databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com" };
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 
-        // রেন্ডার সার্ভার সজাগ রাখতে পিং
+        // ব্যাকএন্ড সজাগ রাখতে পিং
         setInterval(() => {
             fetch("https://chitti-robot-qh89.onrender.com/chat", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ message: "ping", user_id: "keep_alive" })
+                body: JSON.stringify({ message: "ping" })
             }).catch(() => {});
         }, 240000);
 
-        // ৮টি রিলে ডিভাইসের নাম (আপনার পছন্দমতো পরে এগুলো পরিবর্তন করতে পারবেন)
+        // রিলের নামগুলো আপনার ইচ্ছেমতো এখানে পরিবর্তন করতে পারবেন
         const deviceNames = {
             "relay1": "💡 রিলে ১ (লাইট)",
             "relay2": "🌀 রিলে ২ (ফ্যান)",
@@ -137,14 +135,12 @@
             "relay8": "🔌 রিলে ৮"
         };
 
-        // ডাইনামিক্যালি সুইচগুলো তৈরি করা
         const switchesListDiv = document.getElementById('switchesList');
         for (let i = 1; i <= 8; i++) {
             let key = "relay" + i;
-            let name = deviceNames[key];
             switchesListDiv.innerHTML += `
                 <div class="switch-card">
-                    <span class="switch-label">${name}</span>
+                    <span class="switch-label">${deviceNames[key]}</span>
                     <label class="toggle-switch">
                         <input type="checkbox" id="checkbox_${key}" onchange="toggleDevice('${key}')">
                         <span class="slider"></span>
@@ -153,7 +149,7 @@
             `;
         }
 
-        // ফায়ারবেস থেকে রিয়েল-টাইম স্ট্যাটাস নিয়ে সুইচের চেকবক্স অন/অফ করা
+        // ফায়ারবেস থেকে রিয়েল-টাইম স্ট্যাটাস সিঙ্ক
         for (let i = 1; i <= 8; i++) {
             let key = "relay" + i;
             firebase.database().ref('devices/' + key).on('value', function(snapshot) {
@@ -165,7 +161,6 @@
             });
         }
 
-        // সুইচ পরিবর্তন করলে ফায়ারবেসে সাথে সাথে ডাটা পাঠানো
         function toggleDevice(deviceKey) {
             let checkbox = document.getElementById('checkbox_' + deviceKey);
             let newStatus = checkbox.checked ? "ON" : "OFF";
@@ -240,7 +235,7 @@
                 speakText(data.reply);
             } catch (err) {
                 replyDiv.innerText = "সংযোগের সমস্যা হয়েছে!";
-                eyeState.id = 'idle';
+                eyeState = 'idle';
             }
         }
     </script>
