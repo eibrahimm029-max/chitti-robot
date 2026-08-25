@@ -48,21 +48,26 @@
 
         .box { 
             border: 2px solid rgba(0, 255, 204, 0.3); padding: 20px; border-radius: 20px; 
-            width: 100%; max-width: 450px; box-shadow: 0 0 30px rgba(0, 255, 204, 0.15); 
+            width: 100%; max-width: 480px; box-shadow: 0 0 30px rgba(0, 255, 204, 0.15); 
             background: rgba(16, 16, 26, 0.85); backdrop-filter: blur(10px);
+            max-height: 95vh; overflow-y: auto;
         }
         h2 { font-size: 22px; margin-bottom: 10px; text-shadow: 0 0 10px #00ffcc; }
         #robotFace { background: #000; border: 2px solid #00ffcc; border-radius: 15px; margin: 10px auto; display: block; box-shadow: inset 0 0 15px rgba(0, 255, 204, 0.4); }
         .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; background: rgba(0, 255, 204, 0.1); border: 1px solid #00ffcc; margin-bottom: 10px; }
-        #reply { margin: 10px 0; min-height: 55px; font-size: 15px; line-height: 1.5; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 12px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
-        .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 14px; }
-        .switches-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin: 15px 0; }
-        .switch-btn { background: #18182a; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; border-radius: 8px; font-weight: bold; cursor: pointer; transition: 0.3s; }
+        #reply { margin: 10px 0; min-height: 45px; font-size: 14px; line-height: 1.4; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
+        
+        .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 13px; }
+        
+        /* ৮টি রিলে বাটন গ্রিড */
+        .switches-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0; }
+        .switch-btn { background: #18182a; border: 1px solid #00ffcc; color: #00ffcc; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; transition: 0.3s; }
         .switch-btn:hover { background: #00ffcc; color: #000; }
+        
         .input-group { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
         input[type="text"] { background: #000; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; flex: 1; border-radius: 8px; outline: none; font-size: 14px; }
         .send-btn { background: #00ffcc; color: #000; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 8px; }
-        .mic-btn { background: #ff0055; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; box-shadow: 0 0 10px #ff0055; font-size: 16px; }
+        .mic-btn { background: #ff0055; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; box-shadow: 0 0 10px #ff0055; font-size: 16px; flex-shrink: 0; }
         #audioPlayerContainer { margin-top: 10px; display: none; }
     </style>
 </head>
@@ -93,7 +98,7 @@
         
         <div id="shutdownBanner" class="shutdown-banner">🚨 সাইবার সিকিউরিটি অ্যালার্ট: রোবট শাটডাউন মোডে আছে!</div>
 
-        <canvas id="robotFace" width="280" height="120"></canvas>
+        <canvas id="robotFace" width="260" height="100"></canvas>
 
         <div class="notification-card" id="autoCleanupNotif">
             <p id="notifText">🔔 পুরোনো কিছু ডাটা জমা হয়েছে। ডিলিট করব?</p>
@@ -103,24 +108,32 @@
             </div>
         </div>
 
-        <div id="reply">আমি প্রস্তুত! নির্দেশ দিন অথবা গান বাজাতে বলুন।</div>
+        <div id="reply">আমি প্রস্তুত! নির্দেশ দিন অথবা কন্ট্রোল করুন।</div>
 
         <div id="audioPlayerContainer">
             <audio id="robotAudioPlayer" controls style="width: 100%; border-radius: 8px;"></audio>
         </div>
 
+        <!-- ২টি সেন্সর -->
         <div class="sensor-container">
             <div>🌡️ তাপমাত্রা: <span id="tempVal">--</span>°C</div>
-            <div>🔥 গ্যাস: <span id="gasVal">স্বাভাবিক</span></div>
+            <div>🔥 গ্যাস সেন্সর: <span id="gasVal">স্বাভাবিক</span></div>
         </div>
 
+        <!-- ৮টি রিলে বাটন -->
         <div class="switches-grid">
-            <button class="switch-btn" onclick="toggleDevice('light')">💡 লাইট অন/অফ</button>
-            <button class="switch-btn" onclick="toggleDevice('fan')">🌀 ফ্যান অন/অফ</button>
+            <button class="switch-btn" onclick="toggleDevice('relay1')">💡 রিলে ১ (লাইট)</button>
+            <button class="switch-btn" onclick="toggleDevice('relay2')">🌀 রিলে ২ (ফ্যান)</button>
+            <button class="switch-btn" onclick="toggleDevice('relay3')">🔌 রিলে ৩</button>
+            <button class="switch-btn" onclick="toggleDevice('relay4')">🔌 রিলে ৪</button>
+            <button class="switch-btn" onclick="toggleDevice('relay5')">🔌 রিলে ৫</button>
+            <button class="switch-btn" onclick="toggleDevice('relay6')">🔌 রিলে ৬</button>
+            <button class="switch-btn" onclick="toggleDevice('relay7')">🔌 রিলে ৭</button>
+            <button class="switch-btn" onclick="toggleDevice('relay8')">🔌 রিলে ৮</button>
         </div>
 
         <div class="input-group">
-            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা বলুন (যেমন: গান বাজাও)...">
+            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা বলুন...">
             <button class="send-btn" onclick="sendMsg()">পাঠান</button>
             <button class="mic-btn" onclick="startVoice()">🎤</button>
         </div>
@@ -133,7 +146,6 @@
         function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
         function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
 
-        // ইমার্জেন্সি শাটডাউন স্ট্যাটাস মনিটরিং
         firebase.database().ref('system_status/emergency_shutdown').on('value', function(snapshot) {
             const isShutdown = snapshot.val();
             const banner = document.getElementById('shutdownBanner');
@@ -200,6 +212,7 @@
             });
         }
 
+        // ২ সেন্সরের রিয়েলটাইম মনিটরিং
         firebase.database().ref('sensors').on('value', function(snapshot) {
             const data = snapshot.val();
             if (data) {
@@ -218,19 +231,19 @@
             ctx.fillStyle = "#00ffcc";
             if (eyeState === 'listening') {
                 ctx.shadowBlur = 15; ctx.shadowColor = "#00ffcc";
-                ctx.beginPath(); ctx.arc(80, 50, 22, 0, Math.PI * 2); ctx.arc(200, 50, 22, 0, Math.PI * 2); ctx.fill();
+                ctx.beginPath(); ctx.arc(70, 40, 18, 0, Math.PI * 2); ctx.arc(190, 40, 18, 0, Math.PI * 2); ctx.fill();
             } else {
                 ctx.shadowBlur = 5; ctx.shadowColor = "#00ffcc";
-                ctx.fillRect(60, 40, 40, 20); ctx.fillRect(180, 40, 40, 20);
+                ctx.fillRect(50, 30, 35, 18); ctx.fillRect(175, 30, 35, 18);
             }
             ctx.beginPath();
             if (eyeState === 'speaking') {
                 ctx.lineWidth = 4; ctx.strokeStyle = "#ff0055";
-                let h = Math.random() * 15 + 5;
-                ctx.moveTo(100, 95 - h); ctx.lineTo(140, 95 + h); ctx.lineTo(180, 95 - h); ctx.stroke();
+                let h = Math.random() * 12 + 4;
+                ctx.moveTo(90, 75 - h); ctx.lineTo(130, 75 + h); ctx.lineTo(170, 75 - h); ctx.stroke();
             } else {
                 ctx.lineWidth = 3; ctx.strokeStyle = "#00ffcc";
-                ctx.moveTo(100, 95); ctx.lineTo(180, 95); ctx.stroke();
+                ctx.moveTo(90, 75); ctx.lineTo(170, 75); ctx.stroke();
             }
         }
         setInterval(drawFace, 150);
