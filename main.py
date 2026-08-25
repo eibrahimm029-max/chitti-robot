@@ -23,25 +23,7 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     except Exception as e:
         print("Firebase Init Error:", e)
 
-pending_challenges = {}
-is_voice_recording_active = False
-
-def save_voice_to_firestore(user_id, raw_audio_data):
-    if not is_voice_recording_active or not raw_audio_data or not db_firestore:
-        return
-    try:
-        current_time = time.strftime("%Y-%m-%d_%H-%M-%S")
-        doc_ref = db_firestore.collection('voice_recordings').document(f"{user_id}_{current_time}")
-        doc_ref.set({
-            "speaker_id": user_id,
-            "timestamp": current_time,
-            "audio_file_data": raw_audio_data,
-            "format": "audio/wav"
-        })
-    except Exception as e:
-        print("Firestore Save Error:", e)
-
-# ----------------- ৮টি রিলে ও ডিভাইস ম্যাপ -----------------
+# ----------------- ৮টি রিলে ও ডিভাইস ম্যাপ (ইনস্ট্যান্ট কন্ট্রোল) -----------------
 DEVICE_MAP = {
     "লাইট": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
     "ফ্যান": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
@@ -53,7 +35,7 @@ DEVICE_MAP = {
     "রিলে ৮": "relay8", "relay8": "relay8"
 }
 
-def quick_device_control(msg, user_role):
+def quick_device_control(msg):
     msg_lower = msg.lower()
     is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও"])
     is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও"])
@@ -75,58 +57,50 @@ def quick_device_control(msg, user_role):
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    global is_voice_recording_active
     data = request.json or {}
     msg = data.get("message", "").strip()
-    user_id = data.get("user_id", "owner")
-    raw_audio_data = data.get("audio_data", "")
-
-    if raw_audio_data:
-        save_voice_to_firestore(user_id, raw_audio_data)
-
-    if "সারাদিনের কথা রেকর্ড করো" in msg or "রেকর্ড অন করো" in msg:
-        is_voice_recording_active = True
-        return jsonify({"reply": "সারাদিনের সরাসরি অরিজিনাল ভয়েস রেকর্ড মোড চালু হলো। ফায়ারস্টোরে ডাটা জমা হচ্ছে।"})
     
-    if "রেকর্ড বন্ধ করো" in msg or "রেকর্ড অফ করো" in msg:
-        is_voice_recording_active = False
-        return jsonify({"reply": "ভয়েস রেকর্ড মোড বন্ধ করা হয়েছে।"})
+    # রেন্ডার সার্ভার সজাগ রাখার কিপ-অ্যালাইভ পিং
+    if msg == "ping":
+        return jsonify({"reply": "active"})
 
-    fast_device_reply = quick_device_control(msg, "Owner")
+    # হার্ডওয়্যার বা রিলে কমান্ড তাৎক্ষণিকভাবে এক্সিকিউট করা (বিনা ল্যাগে)
+    fast_device_reply = quick_device_control(msg)
     if fast_device_reply:
         return jsonify({"reply": fast_device_reply})
 
-    if user_id in pending_challenges:
-        if pending_challenges[user_id] in msg:
-            del pending_challenges[user_id]
-            if firebase_admin._apps: db.reference('/chat_history').delete()
-            return jsonify({"reply": "ওনার ভেরিফিকেশন সফল! চ্যাট হিস্ট্রি মুছে ফেলা হয়েছে।"})
-        else:
-            return jsonify({"reply": "ভুল পিন কোড!"})
+    if not OPENROUTER_KEY: 
+        return jsonify({"reply": "এপিআই কি (API Key) কনফিগার করা নেই!"})
 
-    if any(word in msg.lower() for word in ["ডিলিট", "মুছে", "সাফ", "কাটো"]):
-        if any(w in msg.lower() for w in ["হিসাব", "সিস্টেম", "ডাটাবেজ"]):
-            return jsonify({"reply": "সিস্টেম বা হিসাবের ডাটা মোছা যাবে না."})
-
-        if any(w in msg.lower() for w in ["চ্যাট", "মেসেজ", "কথা"]):
-            random_pin = str(random.randint(1000, 9999))
-            pending_challenges[user_id] = random_pin
-            return jsonify({"reply": f"প্রাইভেসি পিন কোডটি বলুন: {random_pin}", "challenge_code": random_pin})
-
-    if not OPENROUTER_KEY: return jsonify({"reply": "API Key নেই!"})
-
-    system_prompt = "আপনি 'চিঠি'। সর্বোচ্চ ১০ শব্দে সংক্ষেপে প্রমিত বাংলায় উত্তর দিন।"
-    headers = {"Authorization": f"Bearer {OPENROUTER_KEY}", "Content-Type": "application/json", "HTTP-Referer": "https://github.com"}
-    payload = {"model": "openrouter/free", "messages": [{"role": "system", "content": system_prompt}, {"role": "user", "content": msg}], "max_tokens": 50}
+    # এআই প্রম্পট: যেকোনো বড় বা ছোট প্রশ্নের সাবলীল উত্তর দেওয়ার জন্য
+    system_prompt = "আপনি 'চিঠি', একটি এআই রোবট। যেকোনো জটিল বা সাধারণ প্রশ্নের বুদ্ধিদীপ্ত ও সুন্দর বাংলা উত্তর দেবেন।"
+    headers = {
+        "Authorization": f"Bearer {OPENROUTER_KEY}", 
+        "Content-Type": "application/json", 
+        "HTTP-Referer": "https://github.com"
+    }
+    payload = {
+        "model": "openrouter/free", 
+        "messages": [
+            {"role": "system", "content": system_prompt}, 
+            {"role": "user", "content": msg}
+        ], 
+        "max_tokens": 150
+    }
 
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=5)
+        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=10)
         result = response.json()
-        reply_text = result["choices"][0]["message"]["content"] if "choices" in result else "বুঝতে পারিনি."
-        clean_reply = reply_text.replace("*", "").replace("#", "").strip()
-        return jsonify({"reply": clean_reply})
-    except Exception:
-        return jsonify({"reply": "সংযোগের সমস্যা হয়েছে."})
+        
+        if "choices" in result and len(result["choices"]) > 0:
+            reply_text = result["choices"][0]["message"]["content"]
+            clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+            return jsonify({"reply": clean_reply})
+        else:
+            return jsonify({"reply": "দুঃখিত, এই মুহূর্তে আমি বুঝতে পারিনি। আবার বলুন।"})
+            
+    except Exception as e:
+        return jsonify({"reply": "সার্ভার এই মুহূর্তে ব্যস্ত আছে, অনুগ্রহ করে আবার চেষ্টা করুন।"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
