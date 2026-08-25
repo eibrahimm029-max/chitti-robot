@@ -11,7 +11,6 @@ OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
 FIREBASE_CREDS = (os.environ.get("FIREBASE_CREDENTIALS_JSON") or os.environ.get("FIREBASE_CRED") or "").strip()
 
-# ফায়ারবেস ও ফায়ারস্টোর ইনিশিয়ালাইজেশন
 db_firestore = None
 if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     try:
@@ -19,11 +18,9 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
         cred = credentials.Certificate(cred_dict)
         firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_URL})
         db_firestore = firestore.client()
-        print("Firebase & Firestore Connected Successfully!")
     except Exception as e:
         print("Firebase Init Error:", e)
 
-# ----------------- ৮টি রিলে ও ডিভাইস ম্যাপ (ইনস্ট্যান্ট কন্ট্রোল) -----------------
 DEVICE_MAP = {
     "লাইট": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
     "ফ্যান": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
@@ -60,20 +57,19 @@ def chat():
     data = request.json or {}
     msg = data.get("message", "").strip()
     
-    # রেন্ডার সার্ভার সজাগ রাখার কিপ-অ্যালাইভ পিং
     if msg == "ping":
         return jsonify({"reply": "active"})
 
-    # হার্ডওয়্যার বা রিলে কমান্ড তাৎক্ষণিকভাবে এক্সিকিউট করা (বিনা ল্যাগে)
     fast_device_reply = quick_device_control(msg)
     if fast_device_reply:
         return jsonify({"reply": fast_device_reply})
 
     if not OPENROUTER_KEY: 
-        return jsonify({"reply": "এপিআই কি (API Key) কনফিগার করা নেই!"})
+        return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
 
-    # এআই প্রম্পট: যেকোনো বড় বা ছোট প্রশ্নের সাবলীল উত্তর দেওয়ার জন্য
-    system_prompt = "আপনি 'চিঠি', একটি এআই রোবট। যেকোনো জটিল বা সাধারণ প্রশ্নের বুদ্ধিদীপ্ত ও সুন্দর বাংলা উত্তর দেবেন।"
+    # কঠোরভাবে বলে দেওয়া হয়েছে যেন শুধু বাংলায় সংক্ষিপ্ত উত্তর দেয়, কোনো ইংরেজি থিংকিং বা অতিরিক্ত কথা না লেখে
+    system_prompt = "আপনি 'চিঠি' নামক একটি এআই রোবট। শুধু প্রমিত বাংলায় ১ থেকে ২ বাক্যে অত্যন্ত সংক্ষেপে উত্তর দিন। কোনো ইংরেজি শব্দ, থিংকিং প্রসেস বা ব্যাখ্যা দেওয়া যাবে না।"
+    
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}", 
         "Content-Type": "application/json", 
@@ -85,7 +81,7 @@ def chat():
             {"role": "system", "content": system_prompt}, 
             {"role": "user", "content": msg}
         ], 
-        "max_tokens": 150
+        "max_tokens": 100
     }
 
     try:
@@ -94,13 +90,17 @@ def chat():
         
         if "choices" in result and len(result["choices"]) > 0:
             reply_text = result["choices"][0]["message"]["content"]
+            # যদি এআই ভুলবশত থিংকিং টেক্সট বা মার্কডাউন রাখে তা ফিল্টার করা
+            if "</think>" in reply_text:
+                reply_text = reply_text.split("</think>")[-1]
+            
             clean_reply = reply_text.replace("*", "").replace("#", "").strip()
             return jsonify({"reply": clean_reply})
         else:
-            return jsonify({"reply": "দুঃখিত, এই মুহূর্তে আমি বুঝতে পারিনি। আবার বলুন।"})
+            return jsonify({"reply": "বুঝতে পারিনি, আবার বলুন।"})
             
-    except Exception as e:
-        return jsonify({"reply": "সার্ভার এই মুহূর্তে ব্যস্ত আছে, অনুগ্রহ করে আবার চেষ্টা করুন।"})
+    except Exception:
+        return jsonify({"reply": "সার্ভার ব্যস্ত আছে, আবার চেষ্টা করুন।"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
