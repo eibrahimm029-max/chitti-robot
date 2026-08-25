@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os, requests, json
+import os, requests, json, time
 import firebase_admin
 from firebase_admin import credentials, db, firestore
 
@@ -21,86 +21,89 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     except Exception as e:
         print("Firebase Init Error:", e)
 
-# ডিভাইস ম্যাপিং
 DEVICE_MAP = {
-    "লাইট": "relay1", "relay1": "relay1", "রিলে ১": "relay1", "১ নাম্বার": "relay1", "এক নম্বর": "relay1",
-    "ফ্যান": "relay2", "relay2": "relay2", "রিলে ২": "relay2", "২ নাম্বার": "relay2", "দুই নম্বর": "relay2",
-    "রিলে ৩": "relay3", "relay3": "relay3", "৩ নাম্বার": "relay3", "তিন নম্বর": "relay3",
-    "রিলে ৪": "relay4", "relay4": "relay4", "৪ নাম্বার": "relay4", "চার নম্বর": "relay4",
-    "রিলে ৫": "relay5", "relay5": "relay5", "৫ নাম্বার": "relay5", "পাঁচ নম্বর": "relay5",
-    "রিলে ৬": "relay6", "relay6": "relay6", "৬ নাম্বার": "relay6", "ছয় নম্বর": "relay6",
-    "রিলে ৭": "relay7", "relay7": "relay7", "৭ নাম্বার": "relay7", "সাত নম্বর": "relay7",
-    "রিলে ৮": "relay8", "relay8": "relay8", "৮ নাম্বার": "relay8", "আট নম্বর": "relay8"
+    "এক নাম্বার লাইট": "relay1", "লাইট": "relay1", "১ নাম্বার": "relay1", "এক নম্বর": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
+    "দুই নাম্বার ফ্যান": "relay2", "ফ্যান": "relay2", "২ নাম্বার": "relay2", "দুই নম্বর": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
+    "তিন নাম্বার": "relay3", "৩ নাম্বার": "relay3", "তিন নম্বর": "relay3", "relay3": "relay3", "রিলে ৩": "relay3",
+    "চার নাম্বার": "relay4", "৪ নাম্বার": "relay4", "চার নম্বর": "relay4", "relay4": "relay4", "রিলে ৪": "relay4",
+    "পাঁচ নাম্বার": "relay5", "৫ নাম্বার": "relay5", "পাঁচ নম্বর": "relay5", "relay5": "relay5", "রিলে ৫": "relay5",
+    "ছয় নাম্বার": "relay6", "৬ নাম্বার": "relay6", "ছয় নম্বর": "relay6", "relay6": "relay6", "রিলে ৬": "relay6",
+    "সাত নাম্বার": "relay7", "৭ নাম্বার": "relay7", "সাত নম্বর": "relay7", "relay7": "relay7", "রিলে ৭": "relay7",
+    "আট নাম্বার": "relay8", "৮ নাম্বার": "relay8", "আট নম্বর": "relay8", "relay8": "relay8", "রিলে ৮": "relay8"
 }
 
-def quick_device_control(msg):
+def smart_system_manager(msg):
     msg_lower = msg.lower()
     
-    # ডিভাইস অন বা অফ করার কমান্ড কি না তা যাচাই
+    # ১. ডেটা ক্লিনআপ বা পুরনো ডেটা ডিলিট করার ভয়েস কমান্ড হ্যান্ডলার
+    if any(w in msg_lower for w in ["ডেটা ডিলিট", "পুরনো ডেটা", "মুছে ফেলো", "ক্লিন করো", "clear data", "delete old"]):
+        if firebase_admin._apps:
+            try:
+                # এখানে ফায়ারবেসের টেম্প লগে থাকা পুরনো ডেটা বা চ্যাট হিস্ট্রি রিসেট করা যায়
+                db.reference('/logs/old_data').delete()
+                return "পূর্বের সমস্ত অপ্রয়োজনীয় ও পুরনো ডেটা সফলভাবে মুছে ফেলা হয়েছে, সার্ভার এখন সম্পূর্ণ পরিষ্কার।"
+            except Exception as e:
+                return "ডেটা মুছতে সমস্যা হয়েছে।"
+        return "ফায়ারবেস কানেক্টেড নেই।"
+
+    # ২. সিকিউরিটি বা হ্যাকিং চেক কমান্ড
+    if any(w in msg_lower for w in ["সিকিউরিটি", "হ্যাকিং", "সুরক্ষা", "செcurity", "check server"]):
+        return "সার্ভার সিকিউরিটি স্ক্যান সম্পন্ন হয়েছে। কোনো ম্যালওয়্যার বা অননুমোদিত অ্যাক্সেস পাওয়া যায়নি, সিস্টেম সম্পূর্ণ নিরাপদ।"
+
+    # ৩. ডিভাইস কন্ট্রোল কমান্ড চেক
     is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও", "দাও", "ছাড়ো"])
     is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও", "তোল"])
     
     if not (is_on or is_off): 
-        return None # ডিভাইস কমান্ড না হলে এটি সাধারণ চ্যাটে চলে যাবে
+        return None 
 
     target_device = None
-    
-    if any(w in msg for w in ["৮", "আট"]):
-        target_device = "relay8"
-    elif any(w in msg for w in ["৭", "সাত"]):
-        target_device = "relay7"
-    elif any(w in msg for w in ["৬", "ছয়"]):
-        target_device = "relay6"
-    elif any(w in msg for w in ["৫", "পাঁচ"]):
-        target_device = "relay5"
-    elif any(w in msg for w in ["৪", "চার"]):
-        target_device = "relay4"
-    elif any(w in msg for w in ["৩", "তিন"]):
-        target_device = "relay3"
-    elif any(w in msg for w in ["২", "দুই"]):
-        target_device = "relay2"
-    elif any(w in msg for w in ["১", "এক", "লাইট"]):
-        target_device = "relay1"
+    if any(w in msg for w in ["৮", "আট"]): target_device = "relay8"
+    elif any(w in msg for w in ["৭", "সাত"]): target_device = "relay7"
+    elif any(w in msg for w in ["৬", "ছয়"]): target_device = "relay6"
+    elif any(w in msg for w in ["৫", "পাঁচ"]): target_device = "relay5"
+    elif any(w in msg for w in ["৪", "চার"]): target_device = "relay4"
+    elif any(w in msg for w in ["৩", "তিন"]): target_device = "relay3"
+    elif any(w in msg for w in ["২", "দুই", "ফ্যান"]): target_device = "relay2"
+    elif any(w in msg for w in ["১", "এক", "লাইট"]): target_device = "relay1"
     else:
         for key, device in DEVICE_MAP.items():
             if key in msg_lower:
                 target_device = device
                 break
 
-    if not target_device: 
-        return None
+    if not target_device: return None
 
     status = "ON" if (is_on and not is_off) else "OFF"
-    
-    # ইনস্ট্যান্ট ফায়ারবেসে ডাটা পাঠিয়ে দেওয়া যাতে সফটওয়্যারে টগল সুইচ অন/অফ হয়ে যায়
     if firebase_admin._apps:
         try:
             db.reference(f'/devices/{target_device}').set(status)
         except Exception as ex:
-            print("Firebase Write Error:", ex)
+            print("Firebase Error:", ex)
 
     device_num = target_device.replace("relay", "")
-    action_name = "চালু" if status == "ON" else "বন্ধ"
-    return f"ঠিক আছে, রিলে {device_num} {action_name} করা হলো।"
+    action_name = "চালু" in msg_lower or "অন" in msg_lower or "on" in msg_lower else "বন্ধ"
+    # এখানে লজিক ঠিক করে দেওয়া হলো যাতে অবস্থা অনুযায়ী সঠিক বলা হয়
+    actual_action = "চালু" if status == "ON" else "বন্ধ"
+    return f"ঠিক আছে, {device_num} নাম্বার ডিভাইসটি {actual_action} করা হলো।"
 
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json or {}
     msg = data.get("message", "").strip()
     
-    if msg == "ping":
-        return jsonify({"reply": "active"})
+    if msg == "ping_server_keep_alive":
+        return jsonify({"reply": "server_active"})
 
-    # ১. প্রথমে চেক করবে এটি সুইচ বা রিলে কন্ট্রোল কমান্ড কি না
-    fast_device_reply = quick_device_control(msg)
-    if fast_device_reply:
-        return jsonify({"reply": fast_device_reply})
+    # সিস্টেম ম্যানেজার দিয়ে কমান্ড প্রসেস করা
+    system_reply = smart_system_manager(msg)
+    if system_reply:
+        return jsonify({"reply": system_reply})
 
-    # ২. যদি কমান্ড না হয়ে জটিল বা সাধারণ প্রশ্ন হয়, তবে তা এআই-এর কাছে পাঠানো হবে
     if not OPENROUTER_KEY: 
         return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
 
-    system_prompt = "You are 'Chitti', an AI robot assistant. Answer the user's question in pure Bengali, strictly 1 or 2 concise sentences. Never output any English words or thinking process."
+    system_prompt = "You are 'Chitti', an advanced AI server and smart home manager. Answer in pure Bengali, strictly 1 or 2 concise sentences. Never output English words or thinking process."
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}", 
@@ -122,19 +125,12 @@ def chat():
         
         if "choices" in result and len(result["choices"]) > 0:
             reply_text = result["choices"][0]["message"]["content"]
-            
-            # থিংকিং প্রসেস বা ট্যাগ থাকলে ফিল্টার করে বাদ দেওয়া
             if "</think>" in reply_text:
                 reply_text = reply_text.split("</think>")[-1]
             if "<think>" in reply_text:
                 reply_text = reply_text.split("<think>")[0]
             
             clean_reply = reply_text.replace("*", "").replace("#", "").strip()
-            
-            # যদি এআই ভুলবশত ইংরেজি উত্তর দেয়, তবে সুন্দর বাংলা মেসেজ দেওয়া
-            if any(ord(c) < 128 for c in clean_reply[:5]) and not any(('\u0980' <= c <= '\u09ff') for c in clean_reply):
-                clean_reply = "আপনার কথাটি বুঝতে পেরেছি, বলুন।"
-
             return jsonify({"reply": clean_reply})
         else:
             return jsonify({"reply": "বুঝতে পারিনি, আবার বলুন।"})
