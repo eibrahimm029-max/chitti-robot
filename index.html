@@ -55,11 +55,10 @@
         h2 { font-size: 22px; margin-bottom: 10px; text-shadow: 0 0 10px #00ffcc; }
         #robotFace { background: #000; border: 2px solid #00ffcc; border-radius: 15px; margin: 10px auto; display: block; box-shadow: inset 0 0 15px rgba(0, 255, 204, 0.4); }
         .status-badge { display: inline-block; padding: 4px 12px; border-radius: 12px; font-size: 12px; background: rgba(0, 255, 204, 0.1); border: 1px solid #00ffcc; margin-bottom: 10px; }
-        #reply { margin: 10px 0; min-height: 45px; font-size: 14px; line-height: 1.4; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
+        #reply { margin: 10px 0; min-height: 55px; font-size: 14px; line-height: 1.4; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
         
         .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 13px; }
         
-        /* ৮টি রিলে বাটন গ্রিড ও স্ট্যাটাস কালার */
         .switches-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0; }
         .switch-btn { background: #18182a; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; transition: 0.3s; }
         .switch-btn.active { background: #00ffcc; color: #000; box-shadow: 0 0 10px #00ffcc; }
@@ -68,7 +67,6 @@
         input[type="text"] { background: #000; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; flex: 1; border-radius: 8px; outline: none; font-size: 14px; }
         .send-btn { background: #00ffcc; color: #000; border: none; padding: 10px 15px; font-weight: bold; cursor: pointer; border-radius: 8px; }
         .mic-btn { background: #ff0055; color: white; border: none; border-radius: 50%; width: 40px; height: 40px; cursor: pointer; box-shadow: 0 0 10px #ff0055; font-size: 16px; flex-shrink: 0; }
-        #audioPlayerContainer { margin-top: 10px; display: none; }
     </style>
 </head>
 <body>
@@ -94,33 +92,19 @@
 
     <div class="box">
         <h2>🤖 চিঠি এআই রোবট</h2>
-        <div class="status-badge" id="roleBadge">ইউজার মোড: Guest</div>
+        <div class="status-badge" id="roleBadge">ইউজার মোড: Owner</div>
         
         <div id="shutdownBanner" class="shutdown-banner">🚨 সাইবার সিকিউরিটি অ্যালার্ট: রোবট শাটডাউন মোডে আছে!</div>
 
         <canvas id="robotFace" width="260" height="100"></canvas>
 
-        <div class="notification-card" id="autoCleanupNotif">
-            <p id="notifText">🔔 পুরোনো কিছু ডাটা জমা হয়েছে। ডিলিট করব?</p>
-            <div class="notif-btn-group">
-                <button class="btn-confirm" onclick="confirmDeleteOldData(true)">হ্যাঁ</button>
-                <button class="btn-cancel" onclick="confirmDeleteOldData(false)">না</button>
-            </div>
-        </div>
-
         <div id="reply">আমি প্রস্তুত! নির্দেশ দিন অথবা কন্ট্রোল করুন।</div>
 
-        <div id="audioPlayerContainer">
-            <audio id="robotAudioPlayer" controls style="width: 100%; border-radius: 8px;"></audio>
-        </div>
-
-        <!-- ২টি সেন্সর -->
         <div class="sensor-container">
             <div>🌡️ তাপমাত্রা: <span id="tempVal">--</span>°C</div>
             <div>🔥 গ্যাস সেন্সর: <span id="gasVal">স্বাভাবিক</span></div>
         </div>
 
-        <!-- ৮টি রিলে বাটন (টগল সিস্টেমযুক্ত) -->
         <div class="switches-grid">
             <button class="switch-btn" id="btn_relay1" onclick="toggleDevice('relay1')">💡 রিলে ১ (লাইট)</button>
             <button class="switch-btn" id="btn_relay2" onclick="toggleDevice('relay2')">🌀 রিলে ২ (ফ্যান)</button>
@@ -133,7 +117,7 @@
         </div>
 
         <div class="input-group">
-            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা বলুন...">
+            <input type="text" id="userInput" placeholder="কমান্ড লিখুন বা বলুন..." onkeypress="handleKeyPress(event)">
             <button class="send-btn" onclick="sendMsg()">পাঠান</button>
             <button class="mic-btn" onclick="startVoice()">🎤</button>
         </div>
@@ -146,6 +130,15 @@
         function openNav() { document.getElementById("mySidebar").style.width = "280px"; }
         function closeNav() { document.getElementById("mySidebar").style.width = "0"; }
 
+        // রেন্ডার সার্ভার ঘুমিয়ে পড়া রোধ করতে প্রতি ৪ মিনিট পরপর ব্যাকগ্রাউন্ড পিং
+        setInterval(() => {
+            fetch("https://chitti-robot-qh89.onrender.com/chat", {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ message: "ping", user_id: "keep_alive" })
+            }).catch(() => {});
+        }, 240000);
+
         firebase.database().ref('system_status/emergency_shutdown').on('value', function(snapshot) {
             const isShutdown = snapshot.val();
             const banner = document.getElementById('shutdownBanner');
@@ -157,62 +150,7 @@
             }
         });
 
-        firebase.database().ref('system_alerts/old_data_notice').on('value', function(snapshot) {
-            const notice = snapshot.val();
-            const notifCard = document.getElementById('autoCleanupNotif');
-            if (notice && notice.status === "pending") {
-                document.getElementById('notifText').innerText = "🔔 " + notice.message;
-                notifCard.style.display = "block";
-            } else {
-                notifCard.style.display = "none";
-            }
-        });
-
-        function confirmDeleteOldData(isApproved) {
-            if (isApproved) { sendMsgDirect("পুরোনো অব্যবহৃত ডাটাগুলো ডিলিট করে দাও"); }
-            firebase.database().ref('system_alerts/old_data_notice').update({ status: "dismissed" });
-            document.getElementById('autoCleanupNotif').style.display = "none";
-        }
-
-        let mediaRecorder;
-        let audioChunks = [];
-        let audioBase64Data = "";
-
-        async function recordAudioBlob() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorder = new MediaRecorder(stream);
-                audioChunks = [];
-                mediaRecorder.ondataavailable = e => audioChunks.push(e.data);
-                mediaRecorder.onstop = () => {
-                    const blob = new Blob(audioChunks, { type: 'audio/wav' });
-                    const reader = new FileReader();
-                    reader.readAsDataURL(blob);
-                    reader.onloadend = () => {
-                        audioBase64Data = reader.result;
-                        document.getElementById('recordStatus').innerText = "ভয়েস স্যাম্পল সংরক্ষিত!";
-                    };
-                };
-                mediaRecorder.start();
-                document.getElementById('recordStatus').innerText = "রেকর্ড হচ্ছে...";
-                setTimeout(() => { mediaRecorder.stop(); }, 3000);
-            } catch (err) { alert("মাইক্রোফোন পারমিশন দিন!"); }
-        }
-
-        function saveMemberWithStorage() {
-            let name = document.getElementById('regName').value.trim();
-            let role = document.getElementById('regRole').value;
-            if(!name || !audioBase64Data) { alert("নাম ও ভয়েস স্যাম্পল দিন!"); return; }
-
-            let memberId = "user_" + Date.now();
-            firebase.database().ref('registered_members/' + memberId).set({ name: name, role: role, has_voice: true });
-            firebase.database().ref('voice_storage/' + memberId).set({ audio_data: audioBase64Data }).then(() => {
-                alert(name + " সফলভাবে রেজিস্টার হয়েছে!");
-                closeNav();
-            });
-        }
-
-        // ২ সেন্সরের রিয়েলটাইম মনিটরিং
+        // সেন্সর রিয়েলটাইম মনিটরিং
         firebase.database().ref('sensors').on('value', function(snapshot) {
             const data = snapshot.val();
             if (data) {
@@ -221,7 +159,7 @@
             }
         });
 
-        // ফায়ারবেস থেকে সব রিলের লাইভ স্ট্যাটাস ট্র্যাক করে ওয়েব বাটনের রঙ ও টগল অবস্থা আপডেট করা
+        // ৮টি রিলের লাইভ স্ট্যাটাস সিঙ্ক
         for (let i = 1; i <= 8; i++) {
             firebase.database().ref('devices/relay' + i).on('value', function(snapshot) {
                 let status = snapshot.val();
@@ -236,7 +174,7 @@
             });
         }
 
-        // টগল সিস্টেম: একবার চাপলে ON, আবার চাপলে OFF হবে (মিলিিসেকেন্ড রেসপন্স)
+        // ইনস্ট্যান্ট ডিভাইস টগল (মিলিসেকেন্ড রেসপন্স)
         function toggleDevice(deviceKey) {
             let dbRef = firebase.database().ref('/devices/' + deviceKey);
             dbRef.once('value', function(snapshot) {
@@ -275,7 +213,7 @@
 
         function startVoice() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("ব্রাউজার সাপোর্ট করে না।"); return; }
+            if (!SpeechRecognition) { alert("ব্রাউজার স্পিচ রিকগনিশন সাপোর্ট করে না।"); return; }
             const recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
             eyeState = 'listening';
@@ -283,9 +221,11 @@
             document.getElementById('reply').innerText = "শুনছি...";
 
             recognition.onresult = function(event) {
-                document.getElementById('userInput').value = event.results[0][0].transcript;
+                let spokenText = event.results[0][0].transcript;
+                document.getElementById('userInput').value = spokenText;
                 sendMsg();
             };
+            recognition.onerror = function() { eyeState = 'idle'; };
             recognition.onend = function() { eyeState = 'idle'; };
         }
 
@@ -300,9 +240,8 @@
             }
         }
 
-        async function sendMsgDirect(txt) {
-            document.getElementById('userInput').value = txt;
-            sendMsg();
+        function handleKeyPress(e) {
+            if (e.key === 'Enter') { sendMsg(); }
         }
 
         async function sendMsg() {
@@ -321,23 +260,13 @@
                     body: JSON.stringify({ message: msg, user_id: "owner" })
                 });
 
+                if (!res.ok) throw new Error("Network response was not ok");
+
                 let data = await res.json();
                 replyDiv.innerText = data.reply;
-                if(data.user_role) {
-                    document.getElementById('roleBadge').innerText = "ইউজার মোড: " + data.user_role;
-                }
-                
-                if (data.audio_url) {
-                    let playerContainer = document.getElementById('audioPlayerContainer');
-                    let player = document.getElementById('robotAudioPlayer');
-                    player.src = data.audio_url;
-                    playerContainer.style.display = "block";
-                    player.play();
-                }
-
                 speakText(data.reply);
             } catch (err) {
-                replyDiv.innerText = "সার্ভার সংযোগ বিচ্ছিন্ন!";
+                replyDiv.innerText = "সার্ভার এই মুহূর্তে ব্যস্ত বা রিস্টার্ট হচ্ছে। আবার চেষ্টা করুন।";
                 eyeState = 'idle';
             }
         }
