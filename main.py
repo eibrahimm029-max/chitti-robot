@@ -21,36 +21,67 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     except Exception as e:
         print("Firebase Init Error:", e)
 
+# সব ধরনের রিলের নাম এবং বাংলা উচ্চারণ ম্যাপিং যাতে ভুল না হয়
 DEVICE_MAP = {
-    "লাইট": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
-    "ফ্যান": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
-    "রিলে ৩": "relay3", "relay3": "relay3",
-    "রিলে ৪": "relay4", "relay4": "relay4",
-    "রিলে ৫": "relay5", "relay5": "relay5",
-    "রিলে ৬": "relay6", "relay6": "relay6",
-    "রিলে ৭": "relay7", "relay7": "relay7",
-    "রিলে ৮": "relay8", "relay8": "relay8"
+    "লাইট": "relay1", "relay1": "relay1", "রিলে ১": "relay1", "১ নাম্বার": "relay1",
+    "ফ্যান": "relay2", "relay2": "relay2", "রিলে ২": "relay2", "২ নাম্বার": "relay2",
+    "রিলে ৩": "relay3", "relay3": "relay3", "৩ নাম্বার": "relay3",
+    "রিলে ৪": "relay4", "relay4": "relay4", "৪ নাম্বার": "relay4",
+    "রিলে ৫": "relay5", "relay5": "relay5", "৫ নাম্বার": "relay5",
+    "রিলে ৬": "relay6", "relay6": "relay6", "৬ নাম্বার": "relay6",
+    "রিলে ৭": "relay7", "relay7": "relay7", "৭ নাম্বার": "relay7",
+    "রিলে ৮": "relay8", "relay8": "relay8", "৮ নাম্বার": "relay8"
 }
 
 def quick_device_control(msg):
     msg_lower = msg.lower()
-    is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও"])
-    is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও"])
-    if not (is_on or is_off): return None
+    
+    # অন বা অফ স্টেট নির্ধারণ
+    is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও", "দাও"])
+    is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও", "তোল"])
+    
+    if not (is_on or is_off): 
+        return None
 
     target_device = None
-    for key, device in DEVICE_MAP.items():
-        if key in msg_lower:
-            target_device = device
-            break
+    
+    # বিশেষ শব্দ চেক (যেমন: রিলে ৮ বা আট নম্বর)
+    if "৮" in msg or "আট" in msg:
+        target_device = "relay8"
+    elif "৭" in msg or "সাত" in msg:
+        target_device = "relay7"
+    elif "৬" in msg or "ছয়" in msg:
+        target_device = "relay6"
+    elif "৫" in msg or "পাঁচ" in msg:
+        target_device = "relay5"
+    elif "৪" in msg or "চার" in msg:
+        target_device = "relay4"
+    elif "৩" in msg or "তিন" in msg:
+        target_device = "relay3"
+    elif "২" in msg or "দুই" in msg:
+        target_device = "relay2"
+    elif "১" in msg or "এক" in msg or "লাইট" in msg:
+        target_device = "relay1"
+    else:
+        for key, device in DEVICE_MAP.items():
+            if key in msg_lower:
+                target_device = device
+                break
 
-    if not target_device: return None
+    if not target_device: 
+        return None
 
-    status = "ON" if is_on else "OFF"
+    status = "ON" if (is_on and not is_off) else "OFF"
+    
+    # ফায়ারবেসে সরাসরি ডাটা পাঠানো
     if firebase_admin._apps:
-        db.reference(f'/devices/{target_device}').set(status)
+        try:
+            db.reference(f'/devices/{target_device}').set(status)
+        except Exception as ex:
+            print("Firebase Write Error:", ex)
 
-    return f"ঠিক আছে, {target_device.upper()} {status} করা হলো।"
+    device_num = target_device.replace("relay", "")
+    return f"ঠিক আছে, রিলে {device_num} {status} করা হলো।"
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -60,6 +91,7 @@ def chat():
     if msg == "ping":
         return jsonify({"reply": "active"})
 
+    # প্রথমে চেক করবে এটি কোনো রিলে বা ডিভাইস কন্ট্রোল কমান্ড কি না
     fast_device_reply = quick_device_control(msg)
     if fast_device_reply:
         return jsonify({"reply": fast_device_reply})
@@ -67,8 +99,7 @@ def chat():
     if not OPENROUTER_KEY: 
         return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
 
-    # কঠোরভাবে বলে দেওয়া হয়েছে যেন শুধু বাংলায় সংক্ষিপ্ত উত্তর দেয়, কোনো ইংরেজি থিংকিং বা অতিরিক্ত কথা না লেখে
-    system_prompt = "আপনি 'চিঠি' নামক একটি এআই রোবট। শুধু প্রমিত বাংলায় ১ থেকে ২ বাক্যে অত্যন্ত সংক্ষেপে উত্তর দিন। কোনো ইংরেজি শব্দ, থিংকিং প্রসেস বা ব্যাখ্যা দেওয়া যাবে না।"
+    system_prompt = "আপনি 'চিঠি' নামক একটি এআই রোবট। শুধু প্রমিত বাংলায় ১ বাক্যে উত্তর দিন। কোনোভাবেই কোনো ইংরেজি শব্দ, থিংকিং প্রসেস বা ব্যাখ্যা দেওয়া যাবে না।"
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}", 
@@ -81,7 +112,7 @@ def chat():
             {"role": "system", "content": system_prompt}, 
             {"role": "user", "content": msg}
         ], 
-        "max_tokens": 100
+        "max_tokens": 60
     }
 
     try:
@@ -90,11 +121,19 @@ def chat():
         
         if "choices" in result and len(result["choices"]) > 0:
             reply_text = result["choices"][0]["message"]["content"]
-            # যদি এআই ভুলবশত থিংকিং টেক্সট বা মার্কডাউন রাখে তা ফিল্টার করা
+            
+            # ইংরেজি থিংকিং ট্যাগ বা অপ্রয়োজনীয় টেক্সট কেটে ফেলা
             if "</think>" in reply_text:
                 reply_text = reply_text.split("</think>")[-1]
+            if "<think>" in reply_text:
+                reply_text = reply_text.split("<think>")[0]
             
             clean_reply = reply_text.replace("*", "").replace("#", "").strip()
+            
+            # যদি এআই ভুল করে সম্পূর্ণ ইংরেজি উত্তর দেয়, তবে ডিফল্ট বাংলা মেসেজ দেওয়া
+            if any(ord(c) < 128 for c in clean_reply[:5]) and not any(('\u0980' <= c <= '\u09ff') for c in clean_reply):
+                clean_reply = "বুঝেছি, কিন্তু এই মুহূর্তে এটি কার্যকর করা যাচ্ছে না।"
+
             return jsonify({"reply": clean_reply})
         else:
             return jsonify({"reply": "বুঝতে পারিনি, আবার বলুন।"})
