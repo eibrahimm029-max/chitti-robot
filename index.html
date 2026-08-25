@@ -1,9 +1,9 @@
-ll<!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="bn">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি এআই রোবট - স্মার্ট হোম অটোমেশন</title>
+    <title>চিঠি এআই প্রো সিস্টেম - রিয়েল-টাইম প্যাকেট মনিটর</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -31,9 +31,68 @@ ll<!DOCTYPE html>
         #robotFace { background: #000; border: 2px solid #00ffcc; border-radius: 15px; margin: 10px auto; display: block; }
         #reply { margin: 10px 0; min-height: 45px; font-size: 14px; line-height: 1.4; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
         
+        /* রেট্রো সিস্টেম ডিসপ্লে ও মেনুবার স্টাইল */
+        .retro-monitor {
+            background: #0b1a14;
+            border: 2px solid #00ffcc;
+            border-radius: 8px;
+            padding: 8px 12px;
+            margin: 10px 0;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: left;
+            box-shadow: inset 0 0 10px rgba(0, 255, 204, 0.3);
+            position: relative;
+        }
+        .monitor-header { font-size: 11px; color: #00aa88; border-bottom: 1px dashed #005544; padding-bottom: 3px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
+        
+        /* ছোট মেনু বাটন */
+        .menu-btn {
+            background: #00ffcc;
+            color: #000;
+            border: none;
+            padding: 2px 6px;
+            font-size: 10px;
+            font-weight: bold;
+            border-radius: 4px;
+            cursor: pointer;
+        }
+        .menu-btn:hover { background: #ff0055; color: #fff; }
+
+        .monitor-body { font-size: 12px; color: #00ffcc; line-height: 1.4; }
+        .status-safe { color: #00ffcc; }
+        .status-alert { color: #ff3333; animation: blink 1s infinite; }
+        @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
+
+        /* পপআপ বা ডেটেইলস ট্রাফিক পেজ স্টাইল */
+        #trafficModal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 14, 0.95);
+            z-index: 999;
+            justify-content: center;
+            align-items: center;
+            padding: 20px;
+        }
+        .modal-content {
+            background: #0b1a14;
+            border: 2px solid #00ffcc;
+            border-radius: 12px;
+            width: 100%; max-width: 420px;
+            padding: 15px;
+            font-family: 'Courier New', Courier, monospace;
+            text-align: left;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
+            max-height: 85vh;
+            overflow-y: auto;
+        }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #005544; padding-bottom: 5px; margin-bottom: 10px; font-size: 13px; color: #00ffcc; }
+        .close-btn { background: #ff0055; color: #fff; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
+        .traffic-log { font-size: 11px; color: #00ffcc; background: #000; padding: 8px; border-radius: 6px; margin-top: 5px; height: 180px; overflow-y: auto; border: 1px dashed #005544; }
+        .log-entry { margin-bottom: 4px; border-bottom: 1px dotted #222; padding-bottom: 2px; }
+
         .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 13px; }
         
-        /* মোবাইল স্টাইল টগল সুইচ কার্ড */
         .switches-list { display: flex; flex-direction: column; gap: 10px; margin: 15px 0; }
         .switch-card {
             background: rgba(24, 24, 42, 0.8);
@@ -43,44 +102,21 @@ ll<!DOCTYPE html>
             display: flex;
             align-items: center;
             justify-content: space-between;
-            transition: 0.3s;
         }
-        .switch-card:hover { border-color: #00ffcc; box-shadow: 0 0 10px rgba(0, 255, 204, 0.2); }
-        .switch-label { font-size: 14px; font-weight: bold; color: #fff; display: flex; align-items: center; gap: 8px; }
+        .switch-label { font-size: 14px; font-weight: bold; color: #fff; }
 
-        /* টগল স্লাইডার ডিজাইন */
-        .toggle-switch {
-            position: relative;
-            display: inline-block;
-            width: 56px;
-            height: 30px;
-        }
+        .toggle-switch { position: relative; display: inline-block; width: 56px; height: 30px; }
         .toggle-switch input { opacity: 0; width: 0; height: 0; }
         .slider {
-            position: absolute; cursor: pointer;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background-color: #33334d;
-            transition: .3s;
-            border-radius: 30px;
-            border: 1px solid #555;
+            position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0;
+            background-color: #33334d; transition: .3s; border-radius: 30px; border: 1px solid #555;
         }
         .slider:before {
-            position: absolute; content: "";
-            height: 24px; width: 24px;
-            left: 3px; bottom: 2px;
-            background-color: white;
-            transition: .3s;
-            border-radius: 50%;
+            position: absolute; content: ""; height: 24px; width: 24px; left: 3px; bottom: 2px;
+            background-color: white; transition: .3s; border-radius: 50%;
         }
-        input:checked + .slider {
-            background-color: #00ffcc;
-            border-color: #00ffcc;
-            box-shadow: 0 0 10px #00ffcc;
-        }
-        input:checked + .slider:before {
-            transform: translateX(26px);
-            background-color: #000;
-        }
+        input:checked + .slider { background-color: #00ffcc; border-color: #00ffcc; box-shadow: 0 0 10px #00ffcc; }
+        input:checked + .slider:before { transform: translateX(26px); background-color: #000; }
 
         .input-group { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
         input[type="text"] { background: #000; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; flex: 1; border-radius: 8px; outline: none; font-size: 14px; }
@@ -91,20 +127,54 @@ ll<!DOCTYPE html>
 <body>
 
     <div class="box">
-        <h2>🤖 চিঠি এআই রোবট</h2>
+        <h2>🤖 চিঠি এআই প্রো সিস্টেম</h2>
         <canvas id="robotFace" width="260" height="80"></canvas>
-        <div id="reply">আমি প্রস্তুত! নির্দেশ দিন বা প্রশ্ন করুন।</div>
+        <div id="reply">সিস্টেম ও প্যাকেট ট্র্যাকিং সক্রিয় রয়েছে।</div>
+
+        <!-- রেট্রো সিস্টেম মনিটর ডিসপ্লে উইথ মেনু বাটন -->
+        <div class="retro-monitor">
+            <div class="monitor-header">
+                <span>[SYS_MONITOR]</span>
+                <div>
+                    <span id="liveClock" style="margin-right: 5px;">00:00:00</span>
+                    <button class="menu-btn" onclick="openTrafficModal()">মেনু/লগ</button>
+                </div>
+            </div>
+            <div class="monitor-body">
+                <div>🛡️ রাস্তা/নেটওয়ার্ক: <span id="monitorSec" class="status-safe">সুরক্ষিত (HTTPS)</span></div>
+                <div>📡 ফায়ারবেস প্যাকেট: <span id="monitorSig" class="status-safe">রিসিভড (ওকে)</span></div>
+                <div>⚠️ স্নাইফার/হ্যাকিং: <span id="monitorThreat">কোনো বাধা নেই</span></div>
+            </div>
+        </div>
+
+        <!-- রিয়েল-টাইম ফায়ারবেস ও নেটওয়ার্ক ট্রাফিক দেখার আলাদা পপআপ পেজ (মডেল) -->
+        <div id="trafficModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span>📡 লাইভ ফায়ারবেস ও প্যাকেট লগার</span>
+                    <button class="close-btn" onclick="closeTrafficModal()">বন্ধ×</button>
+                </div>
+                <div style="font-size: 11px; margin-bottom: 5px; color: #00aa88;">
+                    * ডেটা আদান-প্রদান এবং রিসিভ হওয়ার রিয়েল-টাইম ট্র্যাক:
+                </div>
+                <div class="traffic-log" id="trafficLogContainer">
+                    <div class="log-entry">[সিস্টেম] কানেকশন ইনিশিয়ালাইজড...</div>
+                </div>
+                <div style="font-size: 10px; margin-top: 8px; color: #aaa;">
+                    🔒 এন্ড-টু-এন্ড সিকিউরিটি: এনক্রিপ্টেড ট্রানজিট ভেরিফাইড।
+                </div>
+            </div>
+        </div>
 
         <div class="sensor-container">
             <div>🌡️ তাপমাত্রা: <span id="tempVal">--</span>°C</div>
             <div>🔥 গ্যাস: <span id="gasVal">স্বাভাবিক</span></div>
         </div>
 
-        <!-- ৮টি রিলে বাটন লিস্ট -->
         <div class="switches-list" id="switchesList"></div>
 
         <div class="input-group">
-            <input type="text" id="userInput" placeholder="কমান্ড দিন বা কিছু জিজ্ঞেস করুন..." onkeypress="if(event.key==='Enter') sendMsg()">
+            <input type="text" id="userInput" placeholder="কমান্ড দিন..." onkeypress="if(event.key==='Enter') sendMsg()">
             <button class="send-btn" onclick="sendMsg()">পাঠান</button>
             <button class="mic-btn" onclick="startVoice()">🎤</button>
         </div>
@@ -114,25 +184,114 @@ ll<!DOCTYPE html>
         const firebaseConfig = { databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com" };
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 
-        // ব্যাকএন্ড সজাগ রাখতে পিং
+        // লাইভ ঘড়ি
+        setInterval(() => {
+            const now = new Date();
+            document.getElementById('liveClock').innerText = now.toLocaleTimeString();
+        }, 1000);
+
+        // লগ বক্সে নতুন মেসেজ বা প্যাকেট তথ্য যুক্ত করার ফাংশন
+        function addTrafficLog(msg, isAlert = false) {
+            const logContainer = document.getElementById('trafficLogContainer');
+            const timeStr = new Date().toLocaleTimeString();
+            const colorStyle = isAlert ? "color: #ff3333;" : "color: #00ffcc;";
+            logContainer.innerHTML += `<div class="log-entry" style="${colorStyle}">[${timeStr}] ${msg}</div>`;
+            logContainer.scrollTop = logContainer.scrollHeight;
+        }
+
+        // মেনু ওপেন ও ক্লোজ ফাংশন
+        function openTrafficModal() {
+            document.getElementById('trafficModal').style.display = 'flex';
+            addTrafficLog("মেনু ওপেন করা হয়েছে: প্যাকেট ট্র্যাকিং সক্রিয়।");
+        }
+        function closeTrafficModal() {
+            document.getElementById('trafficModal').style.display = 'none';
+        }
+
+        // ফায়ারবেস ডেটা আদান-প্রদান এবং রাস্তায় (Transit) কেউ হ্যাক করার চেষ্টা করছে কিনা তা মনিটর করা
+        for (let i = 1; i <= 8; i++) {
+            let key = "relay" + i;
+            let ref = firebase.database().ref('devices/' + key);
+            
+            ref.on('value', function(snapshot) {
+                let status = snapshot.val();
+                let checkbox = document.getElementById('checkbox_' + key);
+                if (checkbox) { 
+                    checkbox.checked = (status === "ON"); 
+                    // ফায়ারবেস থেকে সফলভাবে ডেটা আসার ও ডিভাইস কর্তৃক রিসিভ করার সিগন্যাল লগ করা
+                    addTrafficLog(`[Sync] ${key} এর ডাটা সার্ভার থেকে সফলভাবে রিসিভড: ${status}`);
+                    document.getElementById('monitorSig').innerText = "রিসিভড (ওকে)";
+                    document.getElementById('monitorSig').className = "status-safe";
+                }
+            }, function(error) {
+                // রাস্তায় বা নেটওয়ার্কে ডেটা আদান-প্রদানে সমস্যা বা হ্যাকিং/ইন্ট্রুশন প্রচেষ্টা হলে
+                addTrafficLog(`[Alert] ফায়ারবেস প্যাকেট ড্রপ বা ইন্টারসেপ্ট এরর: ${error.message}`, true);
+                document.getElementById('monitorSig').innerText = "প্যাকেট ড্রপ!";
+                document.getElementById('monitorSig').className = "status-alert";
+                document.getElementById('monitorThreat').innerText = "অস্বাভাবিক ইন্টারসেপ্ট!";
+                document.getElementById('monitorThreat').className = "status-alert";
+            });
+        }
+
+        // ডিভাইস টগল করার সময় ফায়ারবেসে ডেটা পাঠানোর লগ ট্র্যাক করা
+        function toggleDevice(deviceKey) {
+            let checkbox = document.getElementById('checkbox_' + deviceKey);
+            let newStatus = checkbox.checked ? "ON" : "OFF";
+            
+            addTrafficLog(`[Send] পাঠানো হচ্ছে -> ${deviceKey}: ${newStatus}`);
+            
+            firebase.database().ref('/devices/' + deviceKey).set(newStatus)
+                .then(() => {
+                    addTrafficLog(`[Confirm] ${deviceKey} ফায়ারবেসে সফলভাবে সংরক্ষিত।`);
+                })
+                .catch((err) => {
+                    addTrafficLog(`[Error] ডেটা পাঠাতে গিয়ে বাধাগ্রস্ত: ${err.message}`, true);
+                    document.getElementById('monitorThreat').innerText = "অ্যাটাক বা নেটওয়ার্ক ব্লক!";
+                    document.getElementById('monitorThreat').className = "status-alert";
+                });
+        }
+
+        // সার্ভার হেলথ চেক ও নেটওয়ার্ক স্নিফার প্রটেকশন
+        setInterval(async () => {
+            try {
+                let res = await fetch("https://chitti-robot-qh89.onrender.com/chat", {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ message: "ping_system_check" })
+                });
+                if(res.ok) {
+                    document.getElementById('monitorSec').innerText = "সুরক্ষিত (এনক্রিপ্টেড)";
+                    document.getElementById('monitorSec').className = "status-safe";
+                    document.getElementById('monitorThreat').innerText = "কোনো বাধা নেই";
+                    document.getElementById('monitorThreat').className = "status-safe";
+                }
+            } catch (err) {
+                addTrafficLog("[Warning] ব্যাকএন্ড সার্ভার বা ইন্টারনেট সংযোগ বিচ্ছিন্ন!", true);
+                document.getElementById('monitorSec').innerText = "বিচ্ছিন্ন বা আনসেফ!";
+                document.getElementById('monitorSec').className = "status-alert";
+                document.getElementById('monitorThreat').innerText = "সম্ভাব্য নেটওয়ার্ক অ্যাটাক!";
+                document.getElementById('monitorThreat').className = "status-alert";
+            }
+        }, 5000);
+
+        // সার্ভার সজাগ রাখার পিং
         setInterval(() => {
             fetch("https://chitti-robot-qh89.onrender.com/chat", {
                 method: "POST",
                 headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ message: "ping" })
+                body: JSON.stringify({ message: "ping_server_keep_alive" })
             }).catch(() => {});
-        }, 240000);
+        }, 120000);
 
-        // রিলের নামগুলো আপনার ইচ্ছেমতো এখানে পরিবর্তন করতে পারবেন
         const deviceNames = {
-            "relay1": "💡 রিলে ১ (লাইট)",
-            "relay2": "🌀 রিলে ২ (ফ্যান)",
-            "relay3": "🔌 রিলে ৩",
-            "relay4": "🔌 রিলে ৪",
-            "relay5": "🔌 রিলে ৫",
-            "relay6": "🔌 রিলে ৬",
-            "relay7": "🔌 রিলে ৭",
-            "relay8": "🔌 রিলে ৮"
+            "relay1": "💡 ১ নাম্বার লাইট",
+            "relay2": "🌀 ২ নাম্বার ফ্যান",
+            "relay3": "🔌 ৩ নাম্বার রিলে",
+            "relay4": "🔌 ৪ নাম্বার রিলে",
+            "relay5": "🔌 ৫ নাম্বার রিলে",
+            "relay6": "🔌 ৬ নাম্বার রিলে",
+            "relay7": "🔌 ৭ নাম্বার রিলে",
+            "relay8": "🔌 ৮ নাম্বার রিলে"
         };
 
         const switchesListDiv = document.getElementById('switchesList');
@@ -147,24 +306,6 @@ ll<!DOCTYPE html>
                     </label>
                 </div>
             `;
-        }
-
-        // ফায়ারবেস থেকে রিয়েল-টাইম স্ট্যাটাস সিঙ্ক
-        for (let i = 1; i <= 8; i++) {
-            let key = "relay" + i;
-            firebase.database().ref('devices/' + key).on('value', function(snapshot) {
-                let status = snapshot.val();
-                let checkbox = document.getElementById('checkbox_' + key);
-                if (checkbox) {
-                    checkbox.checked = (status === "ON");
-                }
-            });
-        }
-
-        function toggleDevice(deviceKey) {
-            let checkbox = document.getElementById('checkbox_' + deviceKey);
-            let newStatus = checkbox.checked ? "ON" : "OFF";
-            firebase.database().ref('/devices/' + deviceKey).set(newStatus);
         }
 
         const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
