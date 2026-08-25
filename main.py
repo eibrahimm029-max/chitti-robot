@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os, requests, json, time
+import os, requests, json
 import firebase_admin
 from firebase_admin import credentials, db, firestore
 
@@ -35,11 +35,10 @@ DEVICE_MAP = {
 def smart_system_manager(msg):
     msg_lower = msg.lower()
     
-    # ১. ডেটা ক্লিনআপ বা পুরনো ডেটা ডিলিট করার ভয়েস কমান্ড হ্যান্ডলার
+    # ১. ডেটা ক্লিনআপ বা পুরনো ডেটা ডিলিট করার কমান্ড
     if any(w in msg_lower for w in ["ডেটা ডিলিট", "পুরনো ডেটা", "মুছে ফেলো", "ক্লিন করো", "clear data", "delete old"]):
         if firebase_admin._apps:
             try:
-                # এখানে ফায়ারবেসের টেম্প লগে থাকা পুরনো ডেটা বা চ্যাট হিস্ট্রি রিসেট করা যায়
                 db.reference('/logs/old_data').delete()
                 return "পূর্বের সমস্ত অপ্রয়োজনীয় ও পুরনো ডেটা সফলভাবে মুছে ফেলা হয়েছে, সার্ভার এখন সম্পূর্ণ পরিষ্কার।"
             except Exception as e:
@@ -47,7 +46,7 @@ def smart_system_manager(msg):
         return "ফায়ারবেস কানেক্টেড নেই।"
 
     # ২. সিকিউরিটি বা হ্যাকিং চেক কমান্ড
-    if any(w in msg_lower for w in ["সিকিউরিটি", "হ্যাকিং", "সুরক্ষা", "செcurity", "check server"]):
+    if any(w in msg_lower for w in ["সিকিউরিটি", "হ্যাকিং", "সুরক্ষা", "check server"]):
         return "সার্ভার সিকিউরিটি স্ক্যান সম্পন্ন হয়েছে। কোনো ম্যালওয়্যার বা অননুমোদিত অ্যাক্সেস পাওয়া যায়নি, সিস্টেম সম্পূর্ণ নিরাপদ।"
 
     # ৩. ডিভাইস কন্ট্রোল কমান্ড চেক
@@ -74,7 +73,14 @@ def smart_system_manager(msg):
 
     if not target_device: return None
 
-    status = "ON" if (is_on and not is_off) else "OFF"
+    # সিনট্যাক্স এরর মুক্ত নিরাপদ লজিক
+    if is_on and not is_off:
+        status = "ON"
+        actual_action = "চালু"
+    else:
+        status = "OFF"
+        actual_action = "বন্ধ"
+
     if firebase_admin._apps:
         try:
             db.reference(f'/devices/{target_device}').set(status)
@@ -82,9 +88,6 @@ def smart_system_manager(msg):
             print("Firebase Error:", ex)
 
     device_num = target_device.replace("relay", "")
-    action_name = "চালু" in msg_lower or "অন" in msg_lower or "on" in msg_lower else "বন্ধ"
-    # এখানে লজিক ঠিক করে দেওয়া হলো যাতে অবস্থা অনুযায়ী সঠিক বলা হয়
-    actual_action = "চালু" if status == "ON" else "বন্ধ"
     return f"ঠিক আছে, {device_num} নাম্বার ডিভাইসটি {actual_action} করা হলো।"
 
 @app.route('/chat', methods=['POST'])
@@ -92,10 +95,9 @@ def chat():
     data = request.json or {}
     msg = data.get("message", "").strip()
     
-    if msg == "ping_server_keep_alive":
+    if msg in ["ping_server_keep_alive", "ping_system_check"]:
         return jsonify({"reply": "server_active"})
 
-    # সিস্টেম ম্যানেজার দিয়ে কমান্ড প্রসেস করা
     system_reply = smart_system_manager(msg)
     if system_reply:
         return jsonify({"reply": system_reply})
