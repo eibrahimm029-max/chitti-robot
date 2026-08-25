@@ -59,10 +59,10 @@
         
         .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 13px; }
         
-        /* ৮টি রিলে বাটন গ্রিড */
+        /* ৮টি রিলে বাটন গ্রিড ও স্ট্যাটাস কালার */
         .switches-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; margin: 15px 0; }
-        .switch-btn { background: #18182a; border: 1px solid #00ffcc; color: #00ffcc; padding: 8px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; transition: 0.3s; }
-        .switch-btn:hover { background: #00ffcc; color: #000; }
+        .switch-btn { background: #18182a; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; border-radius: 8px; font-weight: bold; font-size: 13px; cursor: pointer; transition: 0.3s; }
+        .switch-btn.active { background: #00ffcc; color: #000; box-shadow: 0 0 10px #00ffcc; }
         
         .input-group { display: flex; justify-content: center; align-items: center; gap: 8px; margin-top: 10px; }
         input[type="text"] { background: #000; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; flex: 1; border-radius: 8px; outline: none; font-size: 14px; }
@@ -120,16 +120,16 @@
             <div>🔥 গ্যাস সেন্সর: <span id="gasVal">স্বাভাবিক</span></div>
         </div>
 
-        <!-- ৮টি রিলে বাটন -->
+        <!-- ৮টি রিলে বাটন (টগল সিস্টেমযুক্ত) -->
         <div class="switches-grid">
-            <button class="switch-btn" onclick="toggleDevice('relay1')">💡 রিলে ১ (লাইট)</button>
-            <button class="switch-btn" onclick="toggleDevice('relay2')">🌀 রিলে ২ (ফ্যান)</button>
-            <button class="switch-btn" onclick="toggleDevice('relay3')">🔌 রিলে ৩</button>
-            <button class="switch-btn" onclick="toggleDevice('relay4')">🔌 রিলে ৪</button>
-            <button class="switch-btn" onclick="toggleDevice('relay5')">🔌 রিলে ৫</button>
-            <button class="switch-btn" onclick="toggleDevice('relay6')">🔌 রিলে ৬</button>
-            <button class="switch-btn" onclick="toggleDevice('relay7')">🔌 রিলে ৭</button>
-            <button class="switch-btn" onclick="toggleDevice('relay8')">🔌 রিলে ৮</button>
+            <button class="switch-btn" id="btn_relay1" onclick="toggleDevice('relay1')">💡 রিলে ১ (লাইট)</button>
+            <button class="switch-btn" id="btn_relay2" onclick="toggleDevice('relay2')">🌀 রিলে ২ (ফ্যান)</button>
+            <button class="switch-btn" id="btn_relay3" onclick="toggleDevice('relay3')">🔌 রিলে ৩</button>
+            <button class="switch-btn" id="btn_relay4" onclick="toggleDevice('relay4')">🔌 রিলে ৪</button>
+            <button class="switch-btn" id="btn_relay5" onclick="toggleDevice('relay5')">🔌 রিলে ৫</button>
+            <button class="switch-btn" id="btn_relay6" onclick="toggleDevice('relay6')">🔌 রিলে ৬</button>
+            <button class="switch-btn" id="btn_relay7" onclick="toggleDevice('relay7')">🔌 রিলে ৭</button>
+            <button class="switch-btn" id="btn_relay8" onclick="toggleDevice('relay8')">🔌 রিলে ৮</button>
         </div>
 
         <div class="input-group">
@@ -220,6 +220,31 @@
                 if (data.gas) document.getElementById('gasVal').innerText = data.gas;
             }
         });
+
+        // ফায়ারবেস থেকে সব রিলের লাইভ স্ট্যাটাস ট্র্যাক করে ওয়েব বাটনের রঙ ও টগল অবস্থা আপডেট করা
+        for (let i = 1; i <= 8; i++) {
+            firebase.database().ref('devices/relay' + i).on('value', function(snapshot) {
+                let status = snapshot.val();
+                let btn = document.getElementById('btn_relay' + i);
+                if (btn) {
+                    if (status === "ON") {
+                        btn.classList.add('active');
+                    } else {
+                        btn.classList.remove('active');
+                    }
+                }
+            });
+        }
+
+        // টগল সিস্টেম: একবার চাপলে ON, আবার চাপলে OFF হবে (মিলিিসেকেন্ড রেসপন্স)
+        function toggleDevice(deviceKey) {
+            let dbRef = firebase.database().ref('/devices/' + deviceKey);
+            dbRef.once('value', function(snapshot) {
+                let currentStatus = snapshot.val();
+                let newStatus = (currentStatus === "ON") ? "OFF" : "ON";
+                dbRef.set(newStatus);
+            });
+        }
 
         const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
         const canvas = document.getElementById('robotFace');
@@ -315,10 +340,6 @@
                 replyDiv.innerText = "সার্ভার সংযোগ বিচ্ছিন্ন!";
                 eyeState = 'idle';
             }
-        }
-
-        function toggleDevice(device) {
-            sendMsgDirect(device + " অন অফ করো");
         }
     </script>
 </body>
