@@ -21,46 +21,46 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     except Exception as e:
         print("Firebase Init Error:", e)
 
-# সব ধরনের রিলের নাম এবং বাংলা উচ্চারণ ম্যাপিং যাতে ভুল না হয়
+# সুনির্দিষ্ট ডিভাইস ম্যাপিং
 DEVICE_MAP = {
-    "লাইট": "relay1", "relay1": "relay1", "রিলে ১": "relay1", "১ নাম্বার": "relay1",
-    "ফ্যান": "relay2", "relay2": "relay2", "রিলে ২": "relay2", "২ নাম্বার": "relay2",
-    "রিলে ৩": "relay3", "relay3": "relay3", "৩ নাম্বার": "relay3",
-    "রিলে ৪": "relay4", "relay4": "relay4", "৪ নাম্বার": "relay4",
-    "রিলে ৫": "relay5", "relay5": "relay5", "৫ নাম্বার": "relay5",
-    "রিলে ৬": "relay6", "relay6": "relay6", "৬ নাম্বার": "relay6",
-    "রিলে ৭": "relay7", "relay7": "relay7", "৭ নাম্বার": "relay7",
-    "রিলে ৮": "relay8", "relay8": "relay8", "৮ নাম্বার": "relay8"
+    "লাইট": "relay1", "relay1": "relay1", "রিলে ১": "relay1", "১ নাম্বার": "relay1", "এক নম্বর": "relay1",
+    "ফ্যান": "relay2", "relay2": "relay2", "রিলে ২": "relay2", "২ নাম্বার": "relay2", "দুই নম্বর": "relay2",
+    "রিলে ৩": "relay3", "relay3": "relay3", "৩ নাম্বার": "relay3", "তিন নম্বর": "relay3",
+    "রিলে ৪": "relay4", "relay4": "relay4", "৪ নাম্বার": "relay4", "চার নম্বর": "relay4",
+    "রিলে ৫": "relay5", "relay5": "relay5", "৫ নাম্বার": "relay5", "পাঁচ নম্বর": "relay5",
+    "রিলে ৬": "relay6", "relay6": "relay6", "৬ নাম্বার": "relay6", "ছয় নম্বর": "relay6",
+    "রিলে ৭": "relay7", "relay7": "relay7", "৭ নাম্বার": "relay7", "সাত নম্বর": "relay7",
+    "রিলে ৮": "relay8", "relay8": "relay8", "৮ নাম্বার": "relay8", "আট নম্বর": "relay8"
 }
 
 def quick_device_control(msg):
     msg_lower = msg.lower()
     
-    # অন বা অফ স্টেট নির্ধারণ
-    is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও", "দাও"])
+    # শুধুমাত্র তখনই ডিভাইস কন্ট্রোল হিসেবে ধরবে যখন অন বা অফ জাতীয় শব্দ থাকবে
+    is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও", "দাও", "ছাড়ো"])
     is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও", "তোল"])
     
     if not (is_on or is_off): 
-        return None
+        return None # ডিভাইস কমান্ড না হলে এটি নান (None) রিটার্ন করবে, তখন এআই চ্যাটে চলে যাবে
 
     target_device = None
     
-    # বিশেষ শব্দ চেক (যেমন: রিলে ৮ বা আট নম্বর)
-    if "৮" in msg or "আট" in msg:
+    # সংখ্যা বা নাম দিয়ে টার্গেট রিলে খোঁজা
+    if any(w in msg for w in ["৮", "আট"]):
         target_device = "relay8"
-    elif "৭" in msg or "সাত" in msg:
+    elif any(w in msg for w in ["৭", "সাত"]):
         target_device = "relay7"
-    elif "৬" in msg or "ছয়" in msg:
+    elif any(w in msg for w in ["৬", "ছয়"]):
         target_device = "relay6"
-    elif "৫" in msg or "পাঁচ" in msg:
+    elif any(w in msg for w in ["৫", "পাঁচ"]):
         target_device = "relay5"
-    elif "৪" in msg or "চার" in msg:
+    elif any(w in msg for w in ["৪", "চার"]):
         target_device = "relay4"
-    elif "৩" in msg or "তিন" in msg:
+    elif any(w in msg for w in ["৩", "তিন"]):
         target_device = "relay3"
-    elif "২" in msg or "দুই" in msg:
+    elif any(w in msg for w in ["২", "দুই"]):
         target_device = "relay2"
-    elif "১" in msg or "এক" in msg or "লাইট" in msg:
+    elif any(w in msg for w in ["১", "এক", "লাইট"]):
         target_device = "relay1"
     else:
         for key, device in DEVICE_MAP.items():
@@ -71,9 +71,10 @@ def quick_device_control(msg):
     if not target_device: 
         return None
 
+    # অন নাকি অফ তা নিশ্চিত করা
     status = "ON" if (is_on and not is_off) else "OFF"
     
-    # ফায়ারবেসে সরাসরি ডাটা পাঠানো
+    # ইনস্ট্যান্ট ফায়ারবেসে ডাটা পাঠানো যাতে সফটওয়ারে টগল সুইচ এনেবল/ডিসএবল হয়ে যায়
     if firebase_admin._apps:
         try:
             db.reference(f'/devices/{target_device}').set(status)
@@ -81,7 +82,8 @@ def quick_device_control(msg):
             print("Firebase Write Error:", ex)
 
     device_num = target_device.replace("relay", "")
-    return f"ঠিক আছে, রিলে {device_num} {status} করা হলো।"
+    action_name = "চালু" if status == "ON" else "বন্ধ"
+    return f"ঠিক আছে, রিলে {device_num} {action_name} করা হলো।"
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -91,15 +93,16 @@ def chat():
     if msg == "ping":
         return jsonify({"reply": "active"})
 
-    # প্রথমে চেক করবে এটি কোনো রিলে বা ডিভাইস কন্ট্রোল কমান্ড কি না
+    # ১. প্রথমে চেক করবে এটি কোনো রিলে বা সুইচ অন-অফ করার কমান্ড কি না
     fast_device_reply = quick_device_control(msg)
     if fast_device_reply:
         return jsonify({"reply": fast_device_reply})
 
+    # ২. যদি ডিভাইস কমান্ড না হয়, তবে এটি সাধারণ প্রশ্ন হিসেবে গণ্য হবে এবং এআই-এর কাছে যাবে
     if not OPENROUTER_KEY: 
         return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
 
-    system_prompt = "আপনি 'চিঠি' নামক একটি এআই রোবট। শুধু প্রমিত বাংলায় ১ বাক্যে উত্তর দিন। কোনোভাবেই কোনো ইংরেজি শব্দ, থিংকিং প্রসেস বা ব্যাখ্যা দেওয়া যাবে না।"
+    system_prompt = "You are 'Chitti', an AI robot assistant. Answer the user's question in pure Bengali, strictly 1 or 2 concise sentences. Do not generate any English words or thinking process."
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}", 
@@ -112,7 +115,7 @@ def chat():
             {"role": "system", "content": system_prompt}, 
             {"role": "user", "content": msg}
         ], 
-        "max_tokens": 60
+        "max_tokens": 100
     }
 
     try:
@@ -122,7 +125,7 @@ def chat():
         if "choices" in result and len(result["choices"]) > 0:
             reply_text = result["choices"][0]["message"]["content"]
             
-            # ইংরেজি থিংকিং ট্যাগ বা অপ্রয়োজনীয় টেক্সট কেটে ফেলা
+            # এআই মডেলের থিংকিং টেক্সট বা ট্যাগ ফিল্টার করে বাদ দেওয়া
             if "</think>" in reply_text:
                 reply_text = reply_text.split("</think>")[-1]
             if "<think>" in reply_text:
@@ -130,9 +133,9 @@ def chat():
             
             clean_reply = reply_text.replace("*", "").replace("#", "").strip()
             
-            # যদি এআই ভুল করে সম্পূর্ণ ইংরেজি উত্তর দেয়, তবে ডিফল্ট বাংলা মেসেজ দেওয়া
+            # যদি এআই ভুলবশত পুরো ইংরেজি আউটপুট দেয়, তবে সুন্দর বাংলা মেসেজ দেওয়া
             if any(ord(c) < 128 for c in clean_reply[:5]) and not any(('\u0980' <= c <= '\u09ff') for c in clean_reply):
-                clean_reply = "বুঝেছি, কিন্তু এই মুহূর্তে এটি কার্যকর করা যাচ্ছে না।"
+                clean_reply = "আপনার কথাটি বুঝতে পেরেছি, বিস্তারিত বলুন।"
 
             return jsonify({"reply": clean_reply})
         else:
