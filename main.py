@@ -21,6 +21,9 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     except Exception as e:
         print("Firebase Init Error:", e)
 
+# ফোনের লোকাল মেমোরি পাথ যেখানে ফাইলগুলো সেভ আছে
+STORAGE_PATH = "/sdcard/ChittiStorage/"
+
 DEVICE_MAP = {
     "এক নাম্বার লাইট": "relay1", "লাইট": "relay1", "১ নাম্বার": "relay1", "এক নম্বর": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
     "দুই নাম্বার ফ্যান": "relay2", "ফ্যান": "relay2", "২ নাম্বার": "relay2", "দুই নম্বর": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
@@ -73,13 +76,8 @@ def smart_system_manager(msg):
 
     if not target_device: return None
 
-    # সিনট্যাক্স এরর মুক্ত নিরাপদ লজিক
-    if is_on and not is_off:
-        status = "ON"
-        actual_action = "চালু"
-    else:
-        status = "OFF"
-        actual_action = "বন্ধ"
+    status = "ON" if (is_on and not is_off) else "OFF"
+    actual_action = "চালু" if status == "ON" else "বন্ধ"
 
     if firebase_admin._apps:
         try:
@@ -90,6 +88,30 @@ def smart_system_manager(msg):
     device_num = target_device.replace("relay", "")
     return f"ঠিক আছে, {device_num} নাম্বার ডিভাইসটি {actual_action} করা হলো।"
 
+def search_chitti_memory(query):
+    """
+    ফোনের ChittiStorage ফোল্ডার থেকে ফাইল স্ক্যান করে মেমোরির তথ্য খুঁজে বের করবে
+    """
+    if not os.path.exists(STORAGE_PATH):
+        return None
+
+    query_lower = query.lower()
+    try:
+        files = os.listdir(STORAGE_PATH)
+        for filename in files:
+            if filename.endswith(".txt"):
+                file_path = os.path.join(STORAGE_PATH, filename)
+                with open(file_path, 'r', encoding='utf-8') as f:
+                    content = f.read()
+                    # যদি প্রশ্নের কোনো গুরুত্বপূর্ণ শব্দ ফাইলের ভেতরে মিলে যায়
+                    if any(word in content.lower() for word in query_lower.split() if len(word) > 2):
+                        clean_content = content.replace("*", "").replace("#", "").strip()
+                        return f"মেমোরি ফাইল থেকে প্রাপ্ত তথ্য: {clean_content[:250]}"
+    except Exception as e:
+        print("Memory Read Error:", e)
+    
+    return None
+
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.json or {}
@@ -98,10 +120,17 @@ def chat():
     if msg in ["ping_server_keep_alive", "ping_system_check"]:
         return jsonify({"reply": "server_active"})
 
+    # ধাপ ১: প্রথমে চেক করবে এটি কোনো হোম অটোমেশন বা ডিভাইস কন্ট্রোল কমান্ড কি না
     system_reply = smart_system_manager(msg)
     if system_reply:
         return jsonify({"reply": system_reply})
 
+    # ধাপ ২: দ্বিতীয়ত চেক করবে ফোনের লোকাল মেমোরি ফাইলগুলোতে এটার কোনো উত্তর বা কোড আছে কি না
+    memory_reply = search_chitti_memory(msg)
+    if memory_reply:
+        return jsonify({"reply": memory_reply})
+
+    # ধাপ ৩: ওপরের দুটিতে না পেলে তখন ওপেনরাউটার (OpenRouter) এআই এর মাধ্যমে বুদ্ধিমান উত্তর নিয়ে আসবে
     if not OPENROUTER_KEY: 
         return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
 
