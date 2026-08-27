@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি এআই প্রো সিস্টেম - রিয়েল-টাইম প্যাকেট মনিটর</title>
+    <title>চিঠি এআই প্রো সিস্টেম - রিয়েল-टाइम প্যাকেট মনিটর</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -218,13 +218,11 @@
                 let checkbox = document.getElementById('checkbox_' + key);
                 if (checkbox) { 
                     checkbox.checked = (status === "ON"); 
-                    // ফায়ারবেস থেকে সফলভাবে ডেটা আসার ও ডিভাইস কর্তৃক রিসিভ করার সিগন্যাল লগ করা
                     addTrafficLog(`[Sync] ${key} এর ডাটা সার্ভার থেকে সফলভাবে রিসিভড: ${status}`);
                     document.getElementById('monitorSig').innerText = "রিসিভড (ওকে)";
                     document.getElementById('monitorSig').className = "status-safe";
                 }
             }, function(error) {
-                // রাস্তায় বা নেটওয়ার্কে ডেটা আদান-প্রদানে সমস্যা বা হ্যাকিং/ইন্ট্রুশন প্রচেষ্টা হলে
                 addTrafficLog(`[Alert] ফায়ারবেস প্যাকেট ড্রপ বা ইন্টারসেপ্ট এরর: ${error.message}`, true);
                 document.getElementById('monitorSig').innerText = "প্যাকেট ড্রপ!";
                 document.getElementById('monitorSig').className = "status-alert";
