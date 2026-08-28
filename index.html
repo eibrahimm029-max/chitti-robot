@@ -85,8 +85,8 @@
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #005544; padding-bottom: 5px; margin-bottom: 10px; font-size: 13px; color: #00ffcc; }
         .close-btn { background: #ff0055; color: #fff; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .traffic-log { font-size: 11px; color: #00ffcc; background: #000; padding: 8px; border-radius: 6px; margin-top: 5px; height: 180px; overflow-y: auto; border: 1px dashed #005544; }
-        .log-entry { margin-bottom: 4px; border-bottom: 1px dotted #222; padding-bottom: 2px; }
+        .traffic-log { font-size: 11px; color: #00ffcc; background: #000; padding: 8px; border-radius: 6px; margin-top: 5px; height: 200px; overflow-y: auto; border: 1px dashed #005544; }
+        .log-entry { margin-bottom: 6px; border-bottom: 1px dotted #222; padding-bottom: 3px; word-break: break-all; }
 
         .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 13px; }
         
@@ -146,17 +146,17 @@
         <div id="trafficModal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <span>📡 লাইভ প্যাকেট ও ম্যাট্রিক্স লগার</span>
+                    <span>📡 এআই থিঙ্কিং ও লাইভ ম্যাট্রিক্স ফিড</span>
                     <button class="close-btn" onclick="closeTrafficModal()">বন্ধ×</button>
                 </div>
                 <div style="font-size: 11px; margin-bottom: 5px; color: #00aa88;">
-                    * সার্ভার ও ফায়ারবেস রিয়েল-টাইম ডাটা স্ট্রিম:
+                    * এআই কীভাবে তথ্য জোগাড় করছে ও মেমোরি প্রসেস করছে:
                 </div>
                 <div class="traffic-log" id="trafficLogContainer">
-                    <div class="log-entry">[সিস্টেম] কানেকশন ইনিশিয়ালাইজড...</div>
+                    <div class="log-entry">[সিস্টেম] ম্যাট্রিক্স মনিটর ইনিশিয়ালাইজড...</div>
                 </div>
                 <div style="font-size: 10px; margin-top: 8px; color: #aaa;">
-                    🔒 এন্ড-টু-এন্ড লোকাল মেমোরি সিস্টেম ভেরিফাইড।
+                    🔒 সুরক্ষিত বুদ্ধির ভাণ্ডার ও লোকাল মেমোরি ভেরিফাইড।
                 </div>
             </div>
         </div>
@@ -192,12 +192,34 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
+        // ব্যাকএন্ড ফায়ারস্টোর থেকে এআই-এর লাইভ থিঙ্কিং ফিড ফেচ করার ফাংশন
+        let matrixInterval = null;
+        async function fetchLiveMatrixFeed() {
+            try {
+                let res = await fetch("https://chitti-robot-qh89.onrender.com/get_live_matrix");
+                let data = await res.json();
+                if (data.live_feed && data.live_feed.length > 0) {
+                    const logContainer = document.getElementById('trafficLogContainer');
+                    logContainer.innerHTML = ""; // রিফ্রেশ করে লেটেস্ট ফিড দেখাবে
+                    data.live_feed.reverse().forEach(item => {
+                        let badgeColor = item.action === "KNOWLEDGE_ACQUIRED" ? "color: #ff00ff;" : "color: #00ffcc;";
+                        logContainer.innerHTML += `<div class="log-entry" style="${badgeColor}">[${item.time}] <b>[${item.action}]</b>: ${item.details}</div>`;
+                    });
+                    logContainer.scrollTop = logContainer.scrollHeight;
+                }
+            } catch (e) {
+                console.log("Matrix sync error");
+            }
+        }
+
         function openTrafficModal() {
             document.getElementById('trafficModal').style.display = 'flex';
-            addTrafficLog("মেনু ওপেন করা হয়েছে: প্যাকেট ট্র্যাকিং সক্রিয়।");
+            fetchLiveMatrixFeed();
+            matrixInterval = setInterval(fetchLiveMatrixFeed, 2000); // প্রতি ২ সেকেন্ড পর পর লাইভ আপডেট দেখাবে
         }
         function closeTrafficModal() {
             document.getElementById('trafficModal').style.display = 'none';
+            if(matrixInterval) clearInterval(matrixInterval);
         }
 
         for (let i = 1; i <= 8; i++) {
@@ -213,7 +235,6 @@
                     document.getElementById('monitorSig').className = "status-safe";
                 }
             }, function(error) {
-                addTrafficLog(`[Alert] ফায়ারবেস প্যাকেট এরর: ${error.message}`, true);
                 document.getElementById('monitorSig').innerText = "প্যাকেট ড্রপ!";
                 document.getElementById('monitorSig').className = "status-alert";
                 document.getElementById('monitorThreat').innerText = "অস্বাভাবিক ইন্টারসেপ্ট!";
@@ -224,14 +245,10 @@
         function toggleDevice(deviceKey) {
             let checkbox = document.getElementById('checkbox_' + deviceKey);
             let newStatus = checkbox.checked ? "ON" : "OFF";
-            addTrafficLog(`[Send] পাঠানো হচ্ছে -> ${deviceKey}: ${newStatus}`);
             
             firebase.database().ref('/devices/' + deviceKey).set(newStatus)
-                .then(() => {
-                    addTrafficLog(`[Confirm] ${deviceKey} ফায়ারবেসে সফলভাবে সংরক্ষিত।`);
-                })
                 .catch((err) => {
-                    addTrafficLog(`[Error] ডেটা পাঠাতে সমস্যা: ${err.message}`, true);
+                    console.log("Firebase Error:", err);
                 });
         }
 
@@ -241,7 +258,6 @@
                 let res = await fetch("https://chitti-robot-qh89.onrender.com/check_cleanup_status");
                 let data = await res.json();
                 if(data.notification_needed) {
-                    addTrafficLog(data.message, true);
                     alert(data.message);
                 }
             } catch (e) {}
@@ -263,7 +279,7 @@
             } catch (err) {
                 document.getElementById('monitorSec').innerText = "বিচ্ছিন্ন বা আনসেফ!";
                 document.getElementById('monitorSec').className = "status-alert";
-                document.getElementById('monitorThreat').innerText = "నెটওয়ার্ক প্রবলেম!";
+                document.getElementById('monitorThreat').innerText = "নেটওয়ার্ক প্রবলেম!";
                 document.getElementById('monitorThreat').className = "status-alert";
             }
         }, 5000);
@@ -367,7 +383,6 @@
                 let data = await res.json();
                 replyDiv.innerText = data.reply;
                 speakText(data.reply);
-                addTrafficLog(`[AI Engine] মেসেজ প্রসেসড: ${msg.substring(0, 15)}...`);
             } catch (err) {
                 replyDiv.innerText = "সংযোগের সমস্যা হয়েছে!";
                 eyeState = 'idle';
