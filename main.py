@@ -133,7 +133,7 @@ def chat():
     if not OPENROUTER_KEY: 
         return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
 
-    system_prompt = "You are 'Chitti', an advanced AI server and smart home manager. Always reply in clear and natural Bengali, regardless of what the user asks. Keep your answer concise within 1 or 2 sentences. Never output English words or thinking process."
+    system_prompt = "You are 'Chitti', an advanced AI server and smart home manager. Always reply in clear and natural Bengali, regardless of what the user asks. Provide comprehensive, detailed answers without cutting them short. Never output English words or thinking process."
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}", 
@@ -145,11 +145,11 @@ def chat():
             {"role": "system", "content": system_prompt}, 
             {"role": "user", "content": msg}
         ], 
-        "max_tokens": 100
+        "max_tokens": 500
     }
 
     try:
-        response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=10)
+        response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=15)
         result = response.json()
         
         if "choices" in result and len(result["choices"]) > 0:
@@ -169,7 +169,7 @@ def chat():
             
     except Exception as e:
         print("Groq API Error:", e)
-        return jsonify({"reply": "সার্ভার ব্যস্ত আছে, আবার চেষ্টা করুন।"})
+        return jsonify({"reply": f"টেকনিক্যাল এরর: {str(e)}"})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
