@@ -150,7 +150,7 @@
                     <button class="close-btn" onclick="closeTrafficModal()">বন্ধ×</button>
                 </div>
                 <div style="font-size: 11px; margin-bottom: 5px; color: #00aa88;">
-                    * এআই কীভাবে তথ্য জোগাড় করছে ও মেমোরি প্রসেস করছে:
+                    * ফায়ারবেস ও এআই থিঙ্কিং লাইভ লগ:
                 </div>
                 <div class="traffic-log" id="trafficLogContainer">
                     <div class="log-entry">[সিস্টেম] ম্যাট্রিক্স মনিটর ইনিশিয়ালাইজড...</div>
@@ -186,13 +186,13 @@
 
         function addTrafficLog(msg, isAlert = false) {
             const logContainer = document.getElementById('trafficLogContainer');
+            if(!logContainer) return;
             const timeStr = new Date().toLocaleTimeString();
             const colorStyle = isAlert ? "color: #ff3333;" : "color: #00ffcc;";
             logContainer.innerHTML += `<div class="log-entry" style="${colorStyle}">[${timeStr}] ${msg}</div>`;
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        // ব্যাকএন্ড ফায়ারস্টোর থেকে এআই-এর লাইভ থিঙ্কিং ফিড ফেচ করার ফাংশন
         let matrixInterval = null;
         async function fetchLiveMatrixFeed() {
             try {
@@ -200,28 +200,29 @@
                 let data = await res.json();
                 if (data.live_feed && data.live_feed.length > 0) {
                     const logContainer = document.getElementById('trafficLogContainer');
-                    logContainer.innerHTML = ""; // রিফ্রেশ করে লেটেস্ট ফিড দেখাবে
+                    if(!logContainer) return;
+                    logContainer.innerHTML = ""; 
                     data.live_feed.reverse().forEach(item => {
                         let badgeColor = item.action === "KNOWLEDGE_ACQUIRED" ? "color: #ff00ff;" : "color: #00ffcc;";
                         logContainer.innerHTML += `<div class="log-entry" style="${badgeColor}">[${item.time}] <b>[${item.action}]</b>: ${item.details}</div>`;
                     });
                     logContainer.scrollTop = logContainer.scrollHeight;
                 }
-            } catch (e) {
-                console.log("Matrix sync error");
-            }
+            } catch (e) {}
         }
 
         function openTrafficModal() {
             document.getElementById('trafficModal').style.display = 'flex';
+            addTrafficLog("মেনু ওপেন করা হয়েছে: প্যাকেট ট্র্যাকিং সক্রিয়।");
             fetchLiveMatrixFeed();
-            matrixInterval = setInterval(fetchLiveMatrixFeed, 2000); // প্রতি ২ সেকেন্ড পর পর লাইভ আপডেট দেখাবে
+            matrixInterval = setInterval(fetchLiveMatrixFeed, 2000);
         }
         function closeTrafficModal() {
             document.getElementById('trafficModal').style.display = 'none';
             if(matrixInterval) clearInterval(matrixInterval);
         }
 
+        // ফায়ারবেস কানেকশন ও রিলে মনিটরিং
         for (let i = 1; i <= 8; i++) {
             let key = "relay" + i;
             let ref = firebase.database().ref('devices/' + key);
@@ -233,12 +234,14 @@
                     checkbox.checked = (status === "ON"); 
                     document.getElementById('monitorSig').innerText = "রিসিভড (ওকে)";
                     document.getElementById('monitorSig').className = "status-safe";
+                    addTrafficLog(`ফায়ারবেস সিঙ্ক: ${key} এর বর্তমান অবস্থা [${status}]`);
                 }
             }, function(error) {
                 document.getElementById('monitorSig').innerText = "প্যাকেট ড্রপ!";
                 document.getElementById('monitorSig').className = "status-alert";
                 document.getElementById('monitorThreat').innerText = "অস্বাভাবিক ইন্টারসেপ্ট!";
                 document.getElementById('monitorThreat').className = "status-alert";
+                addTrafficLog(`ফায়ারবেস এরর: ${key} সিঙ্ক করতে সমস্যা হয়েছে`, true);
             });
         }
 
@@ -246,51 +249,15 @@
             let checkbox = document.getElementById('checkbox_' + deviceKey);
             let newStatus = checkbox.checked ? "ON" : "OFF";
             
+            addTrafficLog(`কমান্ড পাঠানো হচ্ছে: ${deviceKey} -> ${newStatus}`);
             firebase.database().ref('/devices/' + deviceKey).set(newStatus)
+                .then(() => {
+                    addTrafficLog(`সফল: ${deviceKey} আপডেট হয়েছে ${newStatus}`);
+                })
                 .catch((err) => {
-                    console.log("Firebase Error:", err);
+                    addTrafficLog(`ফেইলড: ${deviceKey} আপডেট করা যায়নি`, true);
                 });
         }
-
-        // ব্যাকএন্ড থেকে পুরনো ডেটা ক্লিনের নোটিফিকেশন চেক করা
-        setInterval(async () => {
-            try {
-                let res = await fetch("https://chitti-robot-qh89.onrender.com/check_cleanup_status");
-                let data = await res.json();
-                if(data.notification_needed) {
-                    alert(data.message);
-                }
-            } catch (e) {}
-        }, 60000);
-
-        setInterval(async () => {
-            try {
-                let res = await fetch("https://chitti-robot-qh89.onrender.com/chat", {
-                    method: "POST",
-                    headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({ message: "ping_system_check" })
-                });
-                if(res.ok) {
-                    document.getElementById('monitorSec').innerText = "সুরক্ষিত (এনক্রিপ্টেড)";
-                    document.getElementById('monitorSec').className = "status-safe";
-                    document.getElementById('monitorThreat').innerText = "কোনো বাধা নেই";
-                    document.getElementById('monitorThreat').className = "status-safe";
-                }
-            } catch (err) {
-                document.getElementById('monitorSec').innerText = "বিচ্ছিন্ন বা আনসেফ!";
-                document.getElementById('monitorSec').className = "status-alert";
-                document.getElementById('monitorThreat').innerText = "নেটওয়ার্ক প্রবলেম!";
-                document.getElementById('monitorThreat').className = "status-alert";
-            }
-        }, 5000);
-
-        setInterval(() => {
-            fetch("https://chitti-robot-qh89.onrender.com/chat", {
-                method: "POST",
-                headers: {"Content-Type": "application/json"},
-                body: JSON.stringify({ message: "ping_server_keep_alive" })
-            }).catch(() => {});
-        }, 120000);
 
         const deviceNames = {
             "relay1": "💡 ১ নাম্বার লাইট",
@@ -346,8 +313,9 @@
             document.getElementById('reply').innerText = "শুনছি...";
 
             recognition.onresult = function(event) {
-                document.getElementById('userInput').value = event.results[0][0].transcript;
-                sendMsg();
+                let spokenText = event.results[0][0].transcript;
+                document.getElementById('userInput').value = spokenText;
+                sendMsg(); // ভয়েস রিসিভ হওয়ার পর সরাসরি সার্ভারে রিকোয়েস্ট পাঠাবে
             };
             recognition.onerror = () => { eyeState = 'idle'; };
             recognition.onend = () => { eyeState = 'idle'; };
@@ -372,6 +340,7 @@
 
             replyDiv.innerText = "প্রসেস হচ্ছে...";
             input.value = "";
+            addTrafficLog(`এআই প্রম্পট পাঠানো হয়েছে: "${msg}"`);
 
             try {
                 let res = await fetch(SERVER_URL, {
@@ -381,10 +350,14 @@
                 });
 
                 let data = await res.json();
-                replyDiv.innerText = data.reply;
-                speakText(data.reply);
+                // ব্যাকএন্ড থেকে আসা নিখুঁত উত্তর প্রদর্শন
+                let aiReply = data.reply || "উত্তর পাওয়া যায়নি।";
+                replyDiv.innerText = aiReply;
+                addTrafficLog(`এআই রেসপন্স সফল: "${aiReply.substring(0, 30)}..."`);
+                speakText(aiReply);
             } catch (err) {
                 replyDiv.innerText = "সংযোগের সমস্যা হয়েছে!";
+                addTrafficLog("সার্ভার কানেকশন এরর!", true);
                 eyeState = 'idle';
             }
         }
