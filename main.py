@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os, requests, json
+import os, requests, json, re
 import firebase_admin
 from firebase_admin import credentials, db, firestore
 
@@ -39,7 +39,7 @@ def smart_system_manager(msg):
     msg_lower = msg.lower()
     
     # ১. ডেটা ক্লিনআপ বা পুরনো ডেটা ডিলিট করার কমান্ড
-    if any(w in msg_lower for w in ["ডেটা ডিলিট", "পুরনো ডেটা", "মুছে ফেলো", "ক্লিন করো", "clear data", "delete old"]):
+    if any(w in msg_lower for w in ["ডেটা ডিলিট", "পুরনো ডেটা", "মুছে ফেলো", "ক্লিন করো", "clear data", "delete old", "ডিলিট করো", "স্টোরেজ", "ফায়ারবেস"]):
         if firebase_admin._apps:
             try:
                 db.reference('/logs/old_data').delete()
@@ -103,7 +103,6 @@ def search_chitti_memory(query):
                 file_path = os.path.join(STORAGE_PATH, filename)
                 with open(file_path, 'r', encoding='utf-8') as f:
                     content = f.read()
-                    # যদি প্রশ্নের কোনো গুরুত্বপূর্ণ শব্দ ফাইলের ভেতরে মিলে যায়
                     if any(word in content.lower() for word in query_lower.split() if len(word) > 2):
                         clean_content = content.replace("*", "").replace("#", "").strip()
                         return f"মেমোরি ফাইল থেকে প্রাপ্ত তথ্য: {clean_content[:250]}"
@@ -120,29 +119,28 @@ def chat():
     if msg in ["ping_server_keep_alive", "ping_system_check"]:
         return jsonify({"reply": "server_active"})
 
-    # ধাপ ১: প্রথমে চেক করবে এটি কোনো হোম অটোমেশন বা ডিভাইস কন্ট্রোল কমান্ড কি না
+    # ধাপ ১: হোম অটোমেশন বা ডিভাইস কন্ট্রোল কমান্ড চেক
     system_reply = smart_system_manager(msg)
     if system_reply:
         return jsonify({"reply": system_reply})
 
-    # ধাপ ২: দ্বিতীয়ত চেক করবে ফোনের লোকাল মেমোরি ফাইলগুলোতে এটার কোনো উত্তর বা কোড আছে কি না
+    # ধাপ ২: ফোনের লোকাল মেমোরি ফাইল চেক
     memory_reply = search_chitti_memory(msg)
     if memory_reply:
         return jsonify({"reply": memory_reply})
 
-    # ধাপ ৩: ওপরের দুটিতে না পেলে তখন ওপেনরাউটার (OpenRouter) এআই এর মাধ্যমে বুদ্ধিমান উত্তর নিয়ে আসবে
+    # ধাপ ৩: গ্রোক এআই (Groq AI) এর মাধ্যমে বুদ্ধিমান উত্তর নিয়ে আসা
     if not OPENROUTER_KEY: 
         return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
 
-    system_prompt = "You are 'Chitti', an advanced AI server and smart home manager. Answer in pure Bengali, strictly 1 or 2 concise sentences. Never output English words or thinking process."
+    system_prompt = "You are 'Chitti', an advanced AI server and smart home manager. Always reply in clear and natural Bengali, regardless of what the user asks. Keep your answer concise within 1 or 2 sentences. Never output English words or thinking process."
     
     headers = {
         "Authorization": f"Bearer {OPENROUTER_KEY}", 
-        "Content-Type": "application/json", 
-        "HTTP-Referer": "https://github.com"
+        "Content-Type": "application/json"
     }
     payload = {
-        "model": "openrouter/free", 
+        "model": "llama-3.3-70b-versatile", 
         "messages": [
             {"role": "system", "content": system_prompt}, 
             {"role": "user", "content": msg}
@@ -151,22 +149,26 @@ def chat():
     }
 
     try:
-        response = requests.post("https://openrouter.ai/api/v1/chat/completions", headers=headers, json=payload, timeout=10)
+        response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=10)
         result = response.json()
         
         if "choices" in result and len(result["choices"]) > 0:
             reply_text = result["choices"][0]["message"]["content"]
+            
+            # যেকোনো থিংকিং বা অযথা ট্যাগ ফিল্টার করা
+            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL)
             if "</think>" in reply_text:
                 reply_text = reply_text.split("</think>")[-1]
             if "<think>" in reply_text:
                 reply_text = reply_text.split("<think>")[0]
             
             clean_reply = reply_text.replace("*", "").replace("#", "").strip()
-            return jsonify({"reply": clean_reply})
+            return jsonify({"reply": clean_reply if clean_reply else "আমি আপনার কথাটি বুঝতে পেরেছি, বলুন কীভাবে সাহায্য করতে পারি?"})
         else:
-            return jsonify({"reply": "বুঝতে পারিনি, আবার বলুন।"})
+            return jsonify({"reply": "আমি আপনার কথাটি বুঝতে পেরেছি, বলুন কীভাবে সাহায্য করতে পারি?"})
             
-    except Exception:
+    except Exception as e:
+        print("Groq API Error:", e)
         return jsonify({"reply": "সার্ভার ব্যস্ত আছে, আবার চেষ্টা করুন।"})
 
 if __name__ == '__main__':
