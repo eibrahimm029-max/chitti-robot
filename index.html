@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি এআই প্রো সিস্টেম - রিয়েল-टाइम প্যাকেট মনিটর</title>
+    <title>চিঠি এআই প্রো সিস্টেম - রিয়েল-টাইম প্যাকেট মনিটর</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -31,7 +31,6 @@
         #robotFace { background: #000; border: 2px solid #00ffcc; border-radius: 15px; margin: 10px auto; display: block; }
         #reply { margin: 10px 0; min-height: 45px; font-size: 14px; line-height: 1.4; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
         
-        /* রেট্রো সিস্টেম ডিসপ্লে ও মেনুবার স্টাইল */
         .retro-monitor {
             background: #0b1a14;
             border: 2px solid #00ffcc;
@@ -45,7 +44,6 @@
         }
         .monitor-header { font-size: 11px; color: #00aa88; border-bottom: 1px dashed #005544; padding-bottom: 3px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
         
-        /* ছোট মেনু বাটন */
         .menu-btn {
             background: #00ffcc;
             color: #000;
@@ -63,7 +61,6 @@
         .status-alert { color: #ff3333; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        /* পপআপ বা ডেটেইলস ট্রাফিক পেজ স্টাইল */
         #trafficModal {
             display: none;
             position: fixed;
@@ -131,7 +128,6 @@
         <canvas id="robotFace" width="260" height="80"></canvas>
         <div id="reply">সিস্টেম ও প্যাকেট ট্র্যাকিং সক্রিয় রয়েছে।</div>
 
-        <!-- রেট্রো সিস্টেম মনিটর ডিসপ্লে উইথ মেনু বাটন -->
         <div class="retro-monitor">
             <div class="monitor-header">
                 <span>[SYS_MONITOR]</span>
@@ -141,27 +137,26 @@
                 </div>
             </div>
             <div class="monitor-body">
-                <div>🛡️ রাস্তা/নেটওয়ার্ক: <span id="monitorSec" class="status-safe">সুরক্ষিত (HTTPS)</span></div>
-                <div>📡 ফায়ারবেস প্যাকেট: <span id="monitorSig" class="status-safe">রিসিভড (ওকে)</span></div>
-                <div>⚠️ স্নাইফার/হ্যাকিং: <span id="monitorThreat">কোনো বাধা নেই</span></div>
+                <div>🛡️ নেটওয়ার্ক: <span id="monitorSec" class="status-safe">সুরক্ষিত (HTTPS)</span></div>
+                <div>📡 প্যাকেট: <span id="monitorSig" class="status-safe">রিসিভড (ওকে)</span></div>
+                <div>⚠️ সিকিউরিটি: <span id="monitorThreat">কোনো বাধা নেই</span></div>
             </div>
         </div>
 
-        <!-- রিয়েল-টাইম ফায়ারবেস ও নেটওয়ার্ক ট্রাফিক দেখার আলাদা পপআপ পেজ (মডেল) -->
         <div id="trafficModal">
             <div class="modal-content">
                 <div class="modal-header">
-                    <span>📡 লাইভ ফায়ারবেস ও প্যাকেট লগার</span>
+                    <span>📡 লাইভ প্যাকেট ও ম্যাট্রিক্স লগার</span>
                     <button class="close-btn" onclick="closeTrafficModal()">বন্ধ×</button>
                 </div>
                 <div style="font-size: 11px; margin-bottom: 5px; color: #00aa88;">
-                    * ডেটা আদান-প্রদান এবং রিসিভ হওয়ার রিয়েল-টাইম ট্র্যাক:
+                    * সার্ভার ও ফায়ারবেস রিয়েল-টাইম ডাটা স্ট্রিম:
                 </div>
                 <div class="traffic-log" id="trafficLogContainer">
                     <div class="log-entry">[সিস্টেম] কানেকশন ইনিশিয়ালাইজড...</div>
                 </div>
                 <div style="font-size: 10px; margin-top: 8px; color: #aaa;">
-                    🔒 এন্ড-টু-এন্ড সিকিউরিটি: এনক্রিপ্টেড ট্রানজিট ভেরিফাইড।
+                    🔒 এন্ড-টু-এন্ড লোকাল মেমোরি সিস্টেম ভেরিফাইড।
                 </div>
             </div>
         </div>
@@ -184,13 +179,11 @@
         const firebaseConfig = { databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com" };
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 
-        // লাইভ ঘড়ি
         setInterval(() => {
             const now = new Date();
             document.getElementById('liveClock').innerText = now.toLocaleTimeString();
         }, 1000);
 
-        // লগ বক্সে নতুন মেসেজ বা প্যাকেট তথ্য যুক্ত করার ফাংশন
         function addTrafficLog(msg, isAlert = false) {
             const logContainer = document.getElementById('trafficLogContainer');
             const timeStr = new Date().toLocaleTimeString();
@@ -199,7 +192,6 @@
             logContainer.scrollTop = logContainer.scrollHeight;
         }
 
-        // মেনু ওপেন ও ক্লোজ ফাংশন
         function openTrafficModal() {
             document.getElementById('trafficModal').style.display = 'flex';
             addTrafficLog("মেনু ওপেন করা হয়েছে: প্যাকেট ট্র্যাকিং সক্রিয়।");
@@ -208,7 +200,6 @@
             document.getElementById('trafficModal').style.display = 'none';
         }
 
-        // ফায়ারবেস ডেটা আদান-প্রদান এবং রাস্তায় (Transit) কেউ হ্যাক করার চেষ্টা করছে কিনা তা মনিটর করা
         for (let i = 1; i <= 8; i++) {
             let key = "relay" + i;
             let ref = firebase.database().ref('devices/' + key);
@@ -218,12 +209,11 @@
                 let checkbox = document.getElementById('checkbox_' + key);
                 if (checkbox) { 
                     checkbox.checked = (status === "ON"); 
-                    addTrafficLog(`[Sync] ${key} এর ডাটা সার্ভার থেকে সফলভাবে রিসিভড: ${status}`);
                     document.getElementById('monitorSig').innerText = "রিসিভড (ওকে)";
                     document.getElementById('monitorSig').className = "status-safe";
                 }
             }, function(error) {
-                addTrafficLog(`[Alert] ফায়ারবেস প্যাকেট ড্রপ বা ইন্টারসেপ্ট এরর: ${error.message}`, true);
+                addTrafficLog(`[Alert] ফায়ারবেস প্যাকেট এরর: ${error.message}`, true);
                 document.getElementById('monitorSig').innerText = "প্যাকেট ড্রপ!";
                 document.getElementById('monitorSig').className = "status-alert";
                 document.getElementById('monitorThreat').innerText = "অস্বাভাবিক ইন্টারসেপ্ট!";
@@ -231,11 +221,9 @@
             });
         }
 
-        // ডিভাইস টগল করার সময় ফায়ারবেসে ডেটা পাঠানোর লগ ট্র্যাক করা
         function toggleDevice(deviceKey) {
             let checkbox = document.getElementById('checkbox_' + deviceKey);
             let newStatus = checkbox.checked ? "ON" : "OFF";
-            
             addTrafficLog(`[Send] পাঠানো হচ্ছে -> ${deviceKey}: ${newStatus}`);
             
             firebase.database().ref('/devices/' + deviceKey).set(newStatus)
@@ -243,13 +231,22 @@
                     addTrafficLog(`[Confirm] ${deviceKey} ফায়ারবেসে সফলভাবে সংরক্ষিত।`);
                 })
                 .catch((err) => {
-                    addTrafficLog(`[Error] ডেটা পাঠাতে গিয়ে বাধাগ্রস্ত: ${err.message}`, true);
-                    document.getElementById('monitorThreat').innerText = "অ্যাটাক বা নেটওয়ার্ক ব্লক!";
-                    document.getElementById('monitorThreat').className = "status-alert";
+                    addTrafficLog(`[Error] ডেটা পাঠাতে সমস্যা: ${err.message}`, true);
                 });
         }
 
-        // সার্ভার হেলথ চেক ও নেটওয়ার্ক স্নিফার প্রটেকশন
+        // ব্যাকএন্ড থেকে পুরনো ডেটা ক্লিনের নোটিফিকেশন চেক করা
+        setInterval(async () => {
+            try {
+                let res = await fetch("https://chitti-robot-qh89.onrender.com/check_cleanup_status");
+                let data = await res.json();
+                if(data.notification_needed) {
+                    addTrafficLog(data.message, true);
+                    alert(data.message);
+                }
+            } catch (e) {}
+        }, 60000);
+
         setInterval(async () => {
             try {
                 let res = await fetch("https://chitti-robot-qh89.onrender.com/chat", {
@@ -264,15 +261,13 @@
                     document.getElementById('monitorThreat').className = "status-safe";
                 }
             } catch (err) {
-                addTrafficLog("[Warning] ব্যাকএন্ড সার্ভার বা ইন্টারনেট সংযোগ বিচ্ছিন্ন!", true);
                 document.getElementById('monitorSec').innerText = "বিচ্ছিন্ন বা আনসেফ!";
                 document.getElementById('monitorSec').className = "status-alert";
-                document.getElementById('monitorThreat').innerText = "সম্ভাব্য নেটওয়ার্ক অ্যাটাক!";
+                document.getElementById('monitorThreat').innerText = "నెটওয়ার্ক প্রবলেম!";
                 document.getElementById('monitorThreat').className = "status-alert";
             }
         }, 5000);
 
-        // সার্ভার সজাগ রাখার পিং
         setInterval(() => {
             fetch("https://chitti-robot-qh89.onrender.com/chat", {
                 method: "POST",
@@ -372,6 +367,7 @@
                 let data = await res.json();
                 replyDiv.innerText = data.reply;
                 speakText(data.reply);
+                addTrafficLog(`[AI Engine] মেসেজ প্রসেসড: ${msg.substring(0, 15)}...`);
             } catch (err) {
                 replyDiv.innerText = "সংযোগের সমস্যা হয়েছে!";
                 eyeState = 'idle';
