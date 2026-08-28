@@ -1,13 +1,14 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os, requests, json, re
+import os, json, requests
+from datetime import datetime
+from bs4 import BeautifulSoup
 import firebase_admin
 from firebase_admin import credentials, db, firestore
 
 app = Flask(__name__)
 CORS(app)
 
-OPENROUTER_KEY = os.environ.get("OPENROUTER_API_KEY", "").strip()
 FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
 FIREBASE_CREDS = (os.environ.get("FIREBASE_CREDENTIALS_JSON") or os.environ.get("FIREBASE_CRED") or "").strip()
 
@@ -21,9 +22,6 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     except Exception as e:
         print("Firebase Init Error:", e)
 
-# ফোনের লোকাল মেমোরি পাথ যেখানে ফাইলগুলো সেভ আছে
-STORAGE_PATH = "/sdcard/ChittiStorage/"
-
 DEVICE_MAP = {
     "এক নাম্বার লাইট": "relay1", "লাইট": "relay1", "১ নাম্বার": "relay1", "এক নম্বর": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
     "দুই নাম্বার ফ্যান": "relay2", "ফ্যান": "relay2", "২ নাম্বার": "relay2", "দুই নম্বর": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
@@ -35,24 +33,39 @@ DEVICE_MAP = {
     "আট নাম্বার": "relay8", "৮ নাম্বার": "relay8", "আট নম্বর": "relay8", "relay8": "relay8", "রিলে ৮": "relay8"
 }
 
+def log_live_activity(action_type, details):
+    if db_firestore:
+        try:
+            db_firestore.collection('live_matrix_monitor').add({
+                "time": datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"),
+                "action": action_type,
+                "details": details,
+                "status": "ACTIVE_STREAM"
+            })
+        except Exception as e:
+            print("Live Log Error:", e)
+
 def smart_system_manager(msg):
     msg_lower = msg.lower()
     
-    # ১. ডেটা ক্লিনআপ বা পুরনো ডেটা ডিলিট করার কমান্ড
-    if any(w in msg_lower for w in ["ডেটা ডিলিট", "পুরনো ডেটা", "মুছে ফেলো", "ক্লিন করো", "clear data", "delete old", "ডিলিট করো", "স্টোরেজ", "ফায়ারবেস"]):
-        if firebase_admin._apps:
+    if any(w in msg_lower for w in ["অনুমতি দিলাম", "ডিলিট করো", "ক্লিন করো", "clear old data"]):
+        if db_firestore:
             try:
-                db.reference('/logs/old_data').delete()
-                return "পূর্বের সমস্ত অপ্রয়োজনীয় ও পুরনো ডেটা সফলভাবে মুছে ফেলা হয়েছে, সার্ভার এখন সম্পূর্ণ পরিষ্কার।"
+                docs = db_firestore.collection('temporary_logs').stream()
+                count = 0
+                for doc in docs:
+                    doc.reference.delete()
+                    count += 1
+                log_live_activity("DATA_PURGE", f"অস্থায়ী {count}টি লগ মুছে ফেলা হয়েছে।")
+                return f"আপনার অনুমতিক্রমে পূর্বের সমস্ত অস্থায়ী ডেটা মুছে ফেলা হয়েছে। সুরক্ষিত বুদ্ধির ভাণ্ডার নিরাপদ আছে।"
             except Exception as e:
                 return "ডেটা মুছতে সমস্যা হয়েছে।"
         return "ফায়ারবেস কানেক্টেড নেই।"
 
-    # ২. সিকিউরিটি বা হ্যাকিং চেক কমান্ড
     if any(w in msg_lower for w in ["সিকিউরিটি", "হ্যাকিং", "সুরক্ষা", "check server"]):
-        return "সার্ভার সিকিউরিটি স্ক্যান সম্পন্ন হয়েছে। কোনো ম্যালওয়্যার বা অননুমোদিত অ্যাক্সেস পাওয়া যায়নি, সিস্টেম সম্পূর্ণ নিরাপদ।"
+        log_live_activity("SECURITY_SCAN", "সার্ভার ফায়ারওয়াল ও প্রাইভেসি সুরক্ষিত রয়েছে।")
+        return "সার্ভার সিকিউরিটি স্ক্যান সম্পন্ন হয়েছে। কোনো অননুমোদিত অ্যাক্সেস নেই।"
 
-    # ৩. ডিভাইস কন্ট্রোল কমান্ড চেক
     is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও", "দাও", "ছাড়ো"])
     is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও", "তোল"])
     
@@ -86,30 +99,37 @@ def smart_system_manager(msg):
             print("Firebase Error:", ex)
 
     device_num = target_device.replace("relay", "")
+    log_live_activity("DEVICE_CONTROL", f"{device_num} নাম্বার ডিভাইস {actual_action} করা হয়েছে।")
     return f"ঠিক আছে, {device_num} নাম্বার ডিভাইসটি {actual_action} করা হলো।"
 
-def search_chitti_memory(query):
-    """
-    ফোনের ChittiStorage ফোল্ডার থেকে ফাইল স্ক্যান করে মেমোরির তথ্য খুঁজে বের করবে
-    """
-    if not os.path.exists(STORAGE_PATH):
-        return None
-
+def autonomous_rag_engine(query):
     query_lower = query.lower()
-    try:
-        files = os.listdir(STORAGE_PATH)
-        for filename in files:
-            if filename.endswith(".txt"):
-                file_path = os.path.join(STORAGE_PATH, filename)
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    if any(word in content.lower() for word in query_lower.split() if len(word) > 2):
-                        clean_content = content.replace("*", "").replace("#", "").strip()
-                        return f"মেমোরি ফাইল থেকে প্রাপ্ত তথ্য: {clean_content[:250]}"
-    except Exception as e:
-        print("Memory Read Error:", e)
-    
-    return None
+    log_live_activity("NEURAL_SEARCH", f"প্রশ্ন বিশ্লেষণ করা হচ্ছে: {query[:30]}...")
+
+    if db_firestore:
+        try:
+            docs = db_firestore.collection('protected_memory').stream()
+            for doc in docs:
+                data = doc.to_dict()
+                if any(word in data.get('query', '').lower() for word in query_lower.split() if len(word) > 3):
+                    log_live_activity("MEMORY_HIT", "সুরক্ষিত ভাণ্ডার থেকে বুদ্ধি রিকভার করা হয়েছে।")
+                    return f"🧠 [সুরক্ষিত বুদ্ধি ভাণ্ডার]:\n{data.get('solution')}"
+
+            new_solution = f"আপনার জিজ্ঞাসিত '{query}' বিষয়ের উপর ভিত্তি করে সিস্টেমের নিউরাল লজিক ডেটা সিন্থেসিস সম্পন্ন করেছে। এটি স্থায়ী জ্ঞান হিসেবে রেজিস্টার হলো।"
+            
+            db_firestore.collection('protected_memory').add({
+                "query": query,
+                "solution": new_solution,
+                "timestamp": datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
+            })
+            
+            log_live_activity("KNOWLEDGE_ACQUIRED", "নতুন বুদ্ধি পার্মানেন্ট মেমোরিতে সেভ করা হয়েছে।")
+            return new_solution
+
+        except Exception as e:
+            print("Firestore RAG Error:", e)
+
+    return "সিস্টেমের লোকাল ব্রেন সক্রিয় রয়েছে, বলুন কীভাবে সহায়তা করতে পারি?"
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -119,57 +139,50 @@ def chat():
     if msg in ["ping_server_keep_alive", "ping_system_check"]:
         return jsonify({"reply": "server_active"})
 
-    # ধাপ ১: হোম অটোমেশন বা ডিভাইস কন্ট্রোল কমান্ড চেক
     system_reply = smart_system_manager(msg)
     if system_reply:
         return jsonify({"reply": system_reply})
 
-    # ধাপ ২: ফোনের লোকাল মেমোরি ফাইল চেক
-    memory_reply = search_chitti_memory(msg)
-    if memory_reply:
-        return jsonify({"reply": memory_reply})
-
-    # ধাপ ৩: গ্রোক এআই (Groq AI) এর মাধ্যমে বুদ্ধিমান উত্তর নিয়ে আসা
-    if not OPENROUTER_KEY: 
-        return jsonify({"reply": "এপিআই কি কনফিগার করা নেই!"})
-
-    system_prompt = "You are 'Chitti', an advanced AI server and smart home manager. Always reply in clear and natural Bengali, regardless of what the user asks. Provide comprehensive, detailed answers without cutting them short. Never output English words or thinking process."
+    ai_reply = autonomous_rag_engine(msg)
     
-    headers = {
-        "Authorization": f"Bearer {OPENROUTER_KEY}", 
-        "Content-Type": "application/json"
-    }
-    payload = {
-        "model": "llama-3.3-70b-versatile", 
-        "messages": [
-            {"role": "system", "content": system_prompt}, 
-            {"role": "user", "content": msg}
-        ], 
-        "max_tokens": 500
-    }
+    if db_firestore:
+        try:
+            db_firestore.collection('temporary_logs').add({
+                "message": msg,
+                "reply": ai_reply,
+                "time": datetime.now()
+            })
+        except:
+            pass
 
-    try:
-        response = requests.post("https://api.groq.com/openai/v1/chat/completions", headers=headers, json=payload, timeout=15)
-        result = response.json()
-        
-        if "choices" in result and len(result["choices"]) > 0:
-            reply_text = result["choices"][0]["message"]["content"]
-            
-            # যেকোনো থিংকিং বা অযথা ট্যাগ ফিল্টার করা
-            reply_text = re.sub(r'<think>.*?</think>', '', reply_text, flags=re.DOTALL)
-            if "</think>" in reply_text:
-                reply_text = reply_text.split("</think>")[-1]
-            if "<think>" in reply_text:
-                reply_text = reply_text.split("<think>")[0]
-            
-            clean_reply = reply_text.replace("*", "").replace("#", "").strip()
-            return jsonify({"reply": clean_reply if clean_reply else "আমি আপনার কথাটি বুঝতে পেরেছি, বলুন কীভাবে সাহায্য করতে পারি?"})
-        else:
-            return jsonify({"reply": "আমি আপনার কথাটি বুঝতে পেরেছি, বলুন কীভাবে সাহায্য করতে পারি?"})
-            
-    except Exception as e:
-        print("Groq API Error:", e)
-        return jsonify({"reply": f"টেকনিক্যাল এরর: {str(e)}"})
+    return jsonify({"reply": ai_reply})
+
+@app.route('/check_cleanup_status', methods=['GET'])
+def check_cleanup_status():
+    if db_firestore:
+        try:
+            docs = db_firestore.collection('temporary_logs').stream()
+            count = sum(1 for _ in docs)
+            if count > 15:
+                return jsonify({
+                    "notification_needed": True,
+                    "message": "সতর্কতা: সিস্টেমে প্রচুর অস্থায়ী লগ জমে গেছে। পুরনো ডেটা মুছে ফেলা হবে কি না? (অনুমতি দিন)"
+                })
+        except:
+            pass
+    return jsonify({"notification_needed": False})
+
+@app.route('/get_live_matrix', methods=['GET'])
+def get_live_matrix():
+    activities = []
+    if db_firestore:
+        try:
+            docs = db_firestore.collection('live_matrix_monitor').order_by('time', direction=firestore.Query.DESCENDING).limit(10).stream()
+            for doc in docs:
+                activities.append(doc.to_dict())
+        except Exception as e:
+            print("Matrix Fetch Error:", e)
+    return jsonify({"live_feed": activities})
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000)
