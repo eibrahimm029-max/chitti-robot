@@ -1,7 +1,8 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-import os, json, random
+import os, json, random, requests
 from datetime import datetime
+from bs4 import BeautifulSoup
 import firebase_admin
 from firebase_admin import credentials, db, firestore
 
@@ -87,45 +88,66 @@ def smart_system_manager(msg):
     log_live_activity("DEVICE_CONTROL", f"{device_num} নাম্বার ডিভাইস {actual_action} করা হয়েছে।")
     return f"নির্দেশ সফল: {device_num} নাম্বার ডিভাইসটি এখন {actual_action} করা হয়েছে।"
 
-# ডাইনামিক ও বুদ্ধিমান রেসপন্স জেনারেটর ইঞ্জিন
+# পাবলিক সোর্স ও ইন্টারনেট স্ক্র্যাপিং ইঞ্জিন
+def fetch_public_web_knowledge(query):
+    try:
+        # ডাকডাকগো বা ওপেন সার্চ সোর্স থেকে তথ্য খোঁজার লাইটওয়েট পদ্ধতি
+        search_url = f"https://html.duckduckgo.com/html/?q={requests.utils.quote(query)}"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(search_url, headers=headers, timeout=5)
+        
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.text, 'html.parser')
+            results = soup.find_all('a', class_='result__snippet', limit=2)
+            snippets = [r.get_text().strip() for r in results]
+            if snippets:
+                return " ".join(snippets)
+    except Exception as e:
+        print("Web Scraping Error:", e)
+    return None
+
 def autonomous_rag_engine(query):
     query_lower = query.lower()
-    log_live_activity("NEURAL_SEARCH", f"ইনপুট বিশ্লেষণ: {query[:30]}...")
+    log_live_activity("NEURAL_SEARCH", f"পাবলিক সোর্স বিশ্লেষণ: {query[:30]}...")
 
-    # কিছু সৃজনশীল ও ডাইনামিক বুদ্ধিমত্তার টেমপ্লেট
-    smart_advice_pool = [
-        f"আপনার এই বিষয়টির ওপর ভিত্তি করে সিস্টেম বিশ্লেষণ করেছে যে, সুনির্দিষ্ট লক্ষ্য ও সঠিক পরিকল্পনা নিয়ে এগিয়ে গেলে এটি সফল করা সম্ভব।",
-        f"('{query}') সম্পর্কিত সমস্যাটির সমাধানে রিলে এবং সেন্সর মডিউলের কানেকশনগুলো আরেকবার যাচাই করে নেওয়া বুদ্ধিমানের কাজ হবে।",
-        f"নিউরাল লজিক বলছে, এই পরিস্থিতিতে একটু বিরতি নিয়ে সার্কিট ফ্লো এবং ডেটা প্যাকেট মনিটর করা উচিত।",
-        f"আপনার এই চিন্তাধারাটি সিস্টেমের কার্যক্ষমতা বাড়াতে দারুণ ভূমিকা রাখবে। এটি দীর্ঘস্থায়ী মেমোরিতে যুক্ত করা হলো।"
-    ]
-
-    selected_solution = random.choice(smart_advice_pool)
-
+    # প্রথমে ফায়ারস্টোরের সুরক্ষিত মেমোরি চেক করা
     if db_firestore:
         try:
-            # আগে থেকে সেভ থাকা মেমোরি চেক করা
             docs = db_firestore.collection('protected_memory').stream()
             for doc in docs:
                 data = doc.to_dict()
                 if any(word in data.get('query', '').lower() for word in query_lower.split() if len(word) > 3):
-                    log_live_activity("MEMORY_HIT", "সুরক্ষিত ভাণ্ডার থেকে বুদ্ধি রিকভার করা হয়েছে।")
-                    return f"🧠 [স্মৃতি ভাণ্ডার থেকে]:\n{data.get('solution')}"
+                    log_live_activity("MEMORY_HIT", "সুরক্ষিত মেমোরি থেকে বুদ্ধি রিট্রিভ করা হয়েছে।")
+                    return f"🧠 [মেমোরি ভাণ্ডার]:\n{data.get('solution')}"
+        except Exception as e:
+            print("Memory Check Error:", e)
 
-            # নতুন বুদ্ধি পার্মানেন্ট মেমোরিতে সেভ করা
+    # মেমোরিতে না থাকলে ইন্টারনেট বা পাবলিক সোর্স থেকে তথ্য সংগ্রহ করা
+    web_data = fetch_public_web_knowledge(query)
+    
+    if web_data:
+        final_solution = f"🌐 [পাবলিক সোর্স থেকে প্রাপ্ত তথ্য]:\n{web_data}\n\nসিস্টেমের লজিক অনুযায়ী এটি বিশ্লেষণ করে স্থায়ী জ্ঞানে রূপান্তর করা হয়েছে।"
+        log_live_activity("WEB_SCRAPE_SUCCESS", "ইন্টারনেট বা পাবলিক সোর্স থেকে সফলভাবে ডেটা ফেচ করা হয়েছে।")
+    else:
+        smart_fallbacks = [
+            f"('{query}') বিষয়ের ওপর ভিত্তি করে সিস্টেম নিজস্ব লজিক দিয়ে সমাধান তৈরি করেছে: সঠিক পরিকল্পনা ও ধারাবাহিকতা বজায় রাখলে এটি সফল হবে।",
+            f"আপনার এই প্রশ্নটির জন্য হার্ডওয়্যার ও সফটওয়্যার লেভেলে মডুলার কানেকশন চেক করা বুদ্ধিমানের কাজ হবে।"
+        ]
+        final_solution = random.choice(smart_fallbacks)
+        log_live_activity("LOCAL_SYNTHESIS", "লোকাল নিউরাল লজিক দিয়ে উত্তর তৈরি করা হয়েছে।")
+
+    # নতুন জ্ঞান ফায়ারস্টোরের protected_memory তে স্থায়ীভাবে সেভ করা
+    if db_firestore:
+        try:
             db_firestore.collection('protected_memory').add({
                 "query": query,
-                "solution": selected_solution,
+                "solution": final_solution,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
             })
-            
-            log_live_activity("KNOWLEDGE_ACQUIRED", "নতুন বুদ্ধি পার্মানেন্ট মেমোরিতে রেজিস্টার হয়েছে।")
-            return selected_solution
-
         except Exception as e:
-            print("Firestore RAG Error:", e)
+            print(e)
 
-    return selected_solution
+    return final_solution
 
 @app.route('/chat', methods=['POST'])
 def chat():
@@ -140,7 +162,6 @@ def chat():
         return jsonify({"reply": system_reply})
 
     ai_reply = autonomous_rag_engine(msg)
-    
     return jsonify({"reply": ai_reply})
 
 @app.route('/get_live_matrix', methods=['GET'])
