@@ -315,7 +315,7 @@
             recognition.onresult = function(event) {
                 let spokenText = event.results[0][0].transcript;
                 document.getElementById('userInput').value = spokenText;
-                sendMsg(); // ভয়েস রিসিভ হওয়ার পর সরাসরি সার্ভারে রিকোয়েস্ট পাঠাবে
+                sendMsg();
             };
             recognition.onerror = () => { eyeState = 'idle'; };
             recognition.onend = () => { eyeState = 'idle'; };
@@ -350,14 +350,13 @@
                 });
 
                 let data = await res.json();
-                // ব্যাকএন্ড থেকে আসা নিখুঁত উত্তর প্রদর্শন
                 let aiReply = data.reply || "উত্তর পাওয়া যায়নি।";
                 replyDiv.innerText = aiReply;
                 addTrafficLog(`এআই রেসপন্স সফল: "${aiReply.substring(0, 30)}..."`);
                 speakText(aiReply);
             } catch (err) {
                 replyDiv.innerText = "সংযোগের সমস্যা হয়েছে!";
-                addTrafficLog("সার্ভার কানেকশন এরর!", true);
+                addTrafficLog("সার্ভার কানেকشن এরর!", true);
                 eyeState = 'idle';
             }
         }
