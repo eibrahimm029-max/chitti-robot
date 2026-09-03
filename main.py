@@ -1,173 +1,113 @@
+import os
 from flask import Flask, request, jsonify
-from flask_cors import CORS
-import os, json, random, difflib
-from datetime import datetime, timedelta
 import firebase_admin
-from firebase_admin import credentials, db, firestore
+from firebase_admin import credentials, db
 
 app = Flask(__name__)
-CORS(app)
 
-FIREBASE_URL = os.environ.get("FIREBASE_DB_URL", "").strip()
-FIREBASE_CREDS = (os.environ.get("FIREBASE_CREDENTIALS_JSON") or os.environ.get("FIREBASE_CRED") or "").strip()
+# ফায়ারবেস ইনিশিয়ালাইজেশন (রেন্ডারের এনভায়রনমেন্ট ভেরিয়েবল বা ডিফল্ট ডাটাবেস URL দিয়ে)
+DATABASE_URL = "https://chitti-bfa21-default-rtdb.firebaseio.com/"
 
-db_firestore = None
-if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
-    try:
-        cred_dict = json.loads(FIREBASE_CREDS)
-        cred = credentials.Certificate(cred_dict)
-        firebase_admin.initialize_app(cred, {'databaseURL': FIREBASE_URL})
-        db_firestore = firestore.client()
-    except Exception as e:
-        print("Firebase Init Error:", e)
+try:
+    if not firebase_admin._apps:
+        # যদি আপনার কাছে serviceAccountKey.json ফাইল থাকে তবে সেটি ব্যবহার করতে পারেন, 
+        # অথবা সরাসরি ডাটাবেস ইউআরএল দিয়ে অ্যাপ ইনিশিয়াল করতে পারেন।
+        firebase_admin.initialize_app(options={
+            'databaseURL': DATABASE_URL
+        })
+except Exception as e:
+    print(f"Firebase Init Error: {e}")
 
-# রিলের তালিকা ও ডিভাইস ম্যাপিং
-DEVICE_MAP = {
-    "এক নাম্বার রিল": "relay1", "১ নাম্বার": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
-    "দুই নাম্বার রিল": "relay2", "২ নাম্বার": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
-    "তিন নাম্বার রিল": "relay3", "৩ নাম্বার": "relay3", "relay3": "relay3", "রিলে ৩": "relay3",
-    "চার নাম্বার রিল": "relay4", "৪ নাম্বার": "relay4", "relay4": "relay4", "রিলে ৪": "relay4",
-    "পাঁচ নাম্বার রিল": "relay5", "৫ নাম্বার": "relay5", "relay5": "relay5", "রিলে ৫": "relay5",
-    "ছয় নাম্বার রিল": "relay6", "৬ নাম্বার": "relay6", "relay6": "relay6", "রিলে ৬": "relay6",
-    "সাত নাম্বার রিল": "relay7", "৭ নাম্বার": "relay7", "relay7": "relay7", "রিলে ৭": "relay7",
-    "আট নাম্বার রিল": "relay8", "৮ নাম্বার": "relay8", "relay8": "relay8", "রিলে ৮": "relay8"
-}
-
-def log_live_activity(action_type, details):
-    if db_firestore:
-        try:
-            db_firestore.collection('live_matrix_monitor').add({
-                "time": datetime.now().strftime("%Y-%m-%d %I:%M:%S %p"),
-                "action": action_type,
-                "details": details,
-                "status": "ACTIVE_STREAM"
-            })
-        except Exception as e:
-            print("Live Log Error:", e)
-
-def intelligent_data_manager():
-    if not db_firestore:
-        return
-    try:
-        docs = db_firestore.collection('temporary_logs').stream()
-        now = datetime.now()
-        purge_candidates = 0
-        for doc in docs:
-            data = doc.to_dict()
-            time_str = data.get('timestamp') or data.get('time')
-            if time_str:
-                try:
-                    log_time = datetime.strptime(time_str, "%Y-%m-%d %I:%M:%S %p")
-                    if now - log_time > timedelta(hours=6):
-                        purge_candidates += 1
-                except:
-                    pass
-
-        if purge_candidates > 0:
-            db_firestore.collection('system_notifications').add({
-                "time": now.strftime("%Y-%m-%d %I:%M:%S %p"),
-                "title": "ডেটা ক্লিনআপ অনুমতি",
-                "message": f"{purge_candidates}টি পুরনো লগ জমে আছে। মুছে ফেলতে অনুমতি দিন।",
-                "status": "PENDING_APPROVAL"
-            })
-    except Exception as e:
-        print("Manager Error:", e)
-
-def smart_system_manager(msg):
-    msg_lower = msg.lower()
-    is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও", "দাও", "ছাড়ো"])
-    is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও", "তোল"])
-    
-    if not (is_on or is_off): 
-        return None 
-
-    target_device = None
-    for key, device in DEVICE_MAP.items():
-        if key in msg_lower:
-            target_device = device
-            break
-
-    if not target_device: return None
-
-    status = "ON" if (is_on and not is_off) else "OFF"
-    actual_action = "চালু" if status == "ON" else "বন্ধ"
-
-    if firebase_admin._apps:
-        try:
-            db.reference(f'/devices/{target_device}').set(status)
-        except Exception as ex:
-            print("Firebase Error:", ex)
-
-    device_num = target_device.replace("relay", "")
-    log_live_activity("DEVICE_CONTROL", f"{device_num} নাম্বার রিল {actual_action} করা হয়েছে।")
-    return f"নির্দেশ সফল: {device_num} নাম্বার রিলটি এখন {actual_action} করা হয়েছে।"
-
-def advanced_autonomous_processing(query):
-    query_lower = query.lower().strip()
-    log_live_activity("LOCAL_NLP_PROCESS", f"ইনপুট প্রসেস হচ্ছে: {query[:30]}...")
-    intelligent_data_manager()
-
-    knowledge_database = {
-        "কেমন আছো": "আলহামদুলিল্লাহ, আপনার সিস্টেম সম্পূর্ণ সচল ও সুরক্ষিত রয়েছে।",
-        "তোমার নাম কি": "আমি আপনার সিক্রেট রোবট সহকারী ও স্মার্ট কন্ট্রোল সিস্টেম।",
-        "মেনু": "মেনু অপশন থেকে আপনি রিলের সমস্ত সুইচগুলো একসাথে দেখতে ও নিয়ন্ত্রণ করতে পারবেন।"
-    }
-
-    best_match = None
-    highest_ratio = 0.0
-    for key, val in knowledge_database.items():
-        ratio = difflib.SequenceMatcher(None, query_lower, key.lower()).ratio()
-        if ratio > highest_ratio:
-            highest_ratio = ratio
-            best_match = val
-
-    if highest_ratio > 0.35 and best_match:
-        response_text = best_match
-    else:
-        dynamic_advice = [
-            f"আপনার ইনপুট '{query}' সিস্টেমে রেকর্ড করা হয়েছে। লক্ষ্য ঠিক রেখে এগিয়ে চলুন!",
-            f"('{query}') এর জন্য সিস্টেমের কানেকশন ও লজিক ফ্লো যাচাই করা হচ্ছে।"
-        ]
-        response_text = random.choice(dynamic_advice)
-
-    if db_firestore:
-        try:
-            db_firestore.collection('protected_memory').add({
-                "query": query,
-                "solution": response_text,
-                "timestamp": datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
-            })
-        except Exception as e:
-            print(e)
-
-    return response_text
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({"status": "Online", "system": "Chitti AI Pro Backend Running"})
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    data = request.json or {}
-    msg = data.get("message", "").strip()
-    
-    if msg in ["ping_server_keep_alive", "ping_system_check"]:
-        return jsonify({"reply": "server_active"})
+    try:
+        data = request.json
+        user_message = data.get('message', '').strip().lower()
+        
+        ai_reply = ""
+        action_taken = "GENERAL_CHAT"
 
-    system_reply = smart_system_manager(msg)
-    if system_reply:
-        return jsonify({"reply": system_reply})
+        # ১. পুরোনো বা অপ্রয়োজনীয় ডাটা ইনস্ট্যান্ট ডিলিট করার লজিক
+        if any(keyword in user_message for keyword in ["ডিলিট", "delete", "মুছে", "cleardata", "clear"]):
+            if any(term in user_message for term in ["সব", "পুরোনো", "পুরাতন", "প্রয়োজন নাই", "অপ্রয়োজনীয়", "old"]):
+                try:
+                    # ফায়ারবেসের ট্রাফিক লগ বা লাইভ ফিড ডাটা ডিলিট করা
+                    db.reference('live_feed').delete()
+                    ai_reply = "আপনার নির্দেশ অনুযায়ী সার্ভারের সমস্ত পুরোনো ও অপ্রয়োজনীয় ডাটা সফলভাবে ডিলিট করে দেওয়া হয়েছে।"
+                    action_taken = "DATA_DELETED"
+                except Exception as ex:
+                    ai_reply = f"ডাটা ডিলিট করার সময় একটি ত্রুটি হয়েছে: {str(ex)}"
+                    action_taken = "ERROR"
+            else:
+                ai_reply = "কোন ডাটাগুলো ডিলিট করব? নির্দিষ্ট করে বলুন, তাহলে ইনস্ট্যান্ট ডিলিট করে দেব।"
+                action_taken = "SPECIFY_DATA_NEEDED"
 
-    ai_reply = advanced_autonomous_processing(msg)
-    return jsonify({"reply": ai_reply})
+        # ২. রেকর্ডিং চালু বা বন্ধ করার লজিক
+        elif "রেকর্ডিং চালু" in user_message or "start recording" in user_message or "রেকর্ড চালু" in user_message:
+            ai_reply = "রেকর্ডিং সিস্টেম সফলভাবে সক্রিয় করা হয়েছে। এখন থেকে সমস্ত অডিও এবং লজিক ফ্লো রেকর্ড করা হবে।"
+            action_taken = "RECORDING_ON"
+            # হার্ডওয়্যার বা ফায়ারবেসে স্টেট আপডেট করার জন্য
+            db.reference('system_state/recording').set("ON")
+
+        elif "রেকর্ডিং বন্ধ" in user_message or "stop recording" in user_message or "রেকর্ড বন্ধ" in user_message:
+            ai_reply = "রেকর্ডিং বন্ধ করে দেওয়া হয়েছে।"
+            action_taken = "RECORDING_OFF"
+            db.reference('system_state/recording').set("OFF")
+
+        # ৩. বিশেষ ঘোষণা বা সিক্রেট শোনানোর কমান্ড
+        elif "ঘোষণা" in user_message or "announcement" in user_message:
+            ai_reply = "বিশেষ ঘোষণা: সিস্টেমের সিকিউরিটি এবং প্যাকেট ফ্লো সম্পূর্ণ স্বাভাবিক রয়েছে। এই বার্তাটি শুধুমাত্র আপনার গোপনীয়তার জন্য।"
+            action_taken = "SPECIAL_ANNOUNCEMENT"
+
+        # ৪. সাধারণ চ্যাট এবং প্রম্পট রেসপন্স
+        else:
+            ai_reply = f"আপনার কমান্ডটি সিস্টেমে রেকর্ড করা হয়েছে: '{user_message}'। লক্ষ্য ঠিক রেখে এগিয়ে চলুন!"
+            action_taken = "GENERAL_CHAT"
+
+        # লাইভ ম্যাট্রিক্স ফিডে লগ সেভ করা যাতে ফ্রন্টএন্ডে রিয়েল-টাইম দেখা যায়
+        try:
+            db.reference('live_feed').push({
+                'action': action_taken,
+                'details': user_message,
+                'time': db.ServerValue.TIMESTAMP
+            })
+        except Exception:
+            pass
+
+        return jsonify({
+            "reply": ai_reply,
+            "action": action_taken
+        }), 200
+
+    except Exception as e:
+        return jsonify({
+            "reply": "সার্ভারে প্রসেসিংয়ের সময় একটি সমস্যা হয়েছে।",
+            "error": str(e)
+        }), 500
 
 @app.route('/get_live_matrix', methods=['GET'])
 def get_live_matrix():
-    activities = []
-    if db_firestore:
-        try:
-            docs = db_firestore.collection('live_matrix_monitor').order_by('time', direction=firestore.Query.DESCENDING).limit(10).stream()
-            for doc in docs:
-                activities.append(doc.to_dict())
-        except Exception as e:
-            print("Matrix Fetch Error:", e)
-    return jsonify({"live_feed": activities})
+    try:
+        ref = db.reference('live_feed')
+        feed_data = ref.order_by_child('time').limit_to_last(15).get()
+        
+        feed_list = []
+        if feed_data:
+            for key, val in feed_data.items():
+                feed_list.append({
+                    "id": key,
+                    "action": val.get('action', 'UNKNOWN'),
+                    "details": val.get('details', ''),
+                    "time": str(val.get('time', ''))
+                })
+        return jsonify({"live_feed": feed_list}), 200
+    except Exception as e:
+        return jsonify({"live_feed": [], "error": str(e)}), 200
 
 if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=5000)
+    port = int(os.environ.get('PORT', 5000))
+    app.run(host='0.0.0.0', port=port)
