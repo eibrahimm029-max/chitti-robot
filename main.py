@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import os, json, random, difflib
-from datetime import datetime
+from datetime import datetime, timedelta
 import firebase_admin
 from firebase_admin import credentials, db, firestore
 
@@ -21,15 +21,16 @@ if FIREBASE_CREDS and FIREBASE_URL and not firebase_admin._apps:
     except Exception as e:
         print("Firebase Init Error:", e)
 
+# রিলের তালিকা ও ডিভাইস ম্যাপিং
 DEVICE_MAP = {
-    "এক নাম্বার লাইট": "relay1", "লাইট": "relay1", "১ নাম্বার": "relay1", "relay1": "relay1",
-    "দুই নাম্বার ফ্যান": "relay2", "ফ্যান": "relay2", "২ নাম্বার": "relay2", "relay2": "relay2",
-    "তিন নাম্বার": "relay3", "৩ নাম্বার": "relay3", "relay3": "relay3",
-    "চার নাম্বার": "relay4", "৪ নাম্বার": "relay4", "relay4": "relay4",
-    "পাঁচ নাম্বার": "relay5", "৫ নাম্বার": "relay5", "relay5": "relay5",
-    "ছয় নাম্বার": "relay6", "৬ নাম্বার": "relay6", "relay6": "relay6",
-    "সাত নাম্বার": "relay7", "৭ নাম্বার": "relay7", "relay7": "relay7",
-    "আট নাম্বার": "relay8", "৮ নাম্বার": "relay8", "relay8": "relay8"
+    "এক নাম্বার রিল": "relay1", "১ নাম্বার": "relay1", "relay1": "relay1", "রিলে ১": "relay1",
+    "দুই নাম্বার রিল": "relay2", "২ নাম্বার": "relay2", "relay2": "relay2", "রিলে ২": "relay2",
+    "তিন নাম্বার রিল": "relay3", "৩ নাম্বার": "relay3", "relay3": "relay3", "রিলে ৩": "relay3",
+    "চার নাম্বার রিল": "relay4", "৪ নাম্বার": "relay4", "relay4": "relay4", "রিলে ৪": "relay4",
+    "পাঁচ নাম্বার রিল": "relay5", "৫ নাম্বার": "relay5", "relay5": "relay5", "রিলে ৫": "relay5",
+    "ছয় নাম্বার রিল": "relay6", "৬ নাম্বার": "relay6", "relay6": "relay6", "রিলে ৬": "relay6",
+    "সাত নাম্বার রিল": "relay7", "৭ নাম্বার": "relay7", "relay7": "relay7", "রিলে ৭": "relay7",
+    "আট নাম্বার রিল": "relay8", "৮ নাম্বার": "relay8", "relay8": "relay8", "রিলে ৮": "relay8"
 }
 
 def log_live_activity(action_type, details):
@@ -44,9 +45,36 @@ def log_live_activity(action_type, details):
         except Exception as e:
             print("Live Log Error:", e)
 
+def intelligent_data_manager():
+    if not db_firestore:
+        return
+    try:
+        docs = db_firestore.collection('temporary_logs').stream()
+        now = datetime.now()
+        purge_candidates = 0
+        for doc in docs:
+            data = doc.to_dict()
+            time_str = data.get('timestamp') or data.get('time')
+            if time_str:
+                try:
+                    log_time = datetime.strptime(time_str, "%Y-%m-%d %I:%M:%S %p")
+                    if now - log_time > timedelta(hours=6):
+                        purge_candidates += 1
+                except:
+                    pass
+
+        if purge_candidates > 0:
+            db_firestore.collection('system_notifications').add({
+                "time": now.strftime("%Y-%m-%d %I:%M:%S %p"),
+                "title": "ডেটা ক্লিনআপ অনুমতি",
+                "message": f"{purge_candidates}টি পুরনো লগ জমে আছে। মুছে ফেলতে অনুমতি দিন।",
+                "status": "PENDING_APPROVAL"
+            })
+    except Exception as e:
+        print("Manager Error:", e)
+
 def smart_system_manager(msg):
     msg_lower = msg.lower()
-    
     is_on = any(w in msg_lower for w in ["চালু", "অন", "on", "জ্বালাও", "দাও", "ছাড়ো"])
     is_off = any(w in msg_lower for w in ["বন্ধ", "অফ", "off", "নিভাও", "তোল"])
     
@@ -71,47 +99,37 @@ def smart_system_manager(msg):
             print("Firebase Error:", ex)
 
     device_num = target_device.replace("relay", "")
-    log_live_activity("DEVICE_CONTROL", f"{device_num} নাম্বার ডিভাইস {actual_action} করা হয়েছে।")
-    return f"নির্দেশ সফল: {device_num} নাম্বার ডিভাইসটি এখন ঠিকঠাকভাবে {actual_action} করা হয়েছে।"
+    log_live_activity("DEVICE_CONTROL", f"{device_num} নাম্বার রিল {actual_action} করা হয়েছে।")
+    return f"নির্দেশ সফল: {device_num} নাম্বার রিলটি এখন {actual_action} করা হয়েছে।"
 
-# নিজস্ব বুদ্ধিমান নলেজ ও প্যাটার্ন ম্যাচিং ইঞ্জিন (কোনো এপিআই লাগবে না)
 def advanced_autonomous_processing(query):
     query_lower = query.lower().strip()
-    log_live_activity("LOCAL_NLP_PROCESS", f"ইনপুট বিশ্লেষণ করা হচ্ছে: {query[:30]}...")
+    log_live_activity("LOCAL_NLP_PROCESS", f"ইনপুট প্রসেস হচ্ছে: {query[:30]}...")
+    intelligent_data_manager()
 
-    # আপনার বিশাল নলেজ বেজ যেখানে নানা ক্যাটাগরির বুদ্ধি ও পরামর্শ রাখা থাকবে
     knowledge_database = {
-        "কেমন আছো": "আলহামদুলিল্লাহ, আমি আপনার নিজস্ব সিক্রেট সার্ভার সিস্টেম। সম্পূর্ণ সচল আছি এবং আপনার কমান্ডের অপেক্ষায় আছি।",
-        "তোমার নাম কি": "আমি আপনার অ্যাপস দ্বারা চালিত একটি স্বাধীন ও স্বয়ংক্রিয় স্মার্ট অ্যাসিস্ট্যান্ট।",
-        "কী করতে পারো": "আমি আপনার ঘরের ডিভাইস (লাইট, ফ্যান ইত্যাদি) রিমোট কন্ট্রোল করতে পারি, লাইভ মনিটরিং দেখাতে পারি এবং আপনার যেকোনো প্রশ্নের বুদ্ধিদীপ্ত সমাধান দিতে পারি।",
-        "সালাম": "ওয়ালাইকুমুসসালাম ওয়া রাহমাতুল্লাহ। আশা করি আপনি ভালো আছেন, বলুন কীভাবে সাহায্য করতে পারি?",
-        "প্রোগ্রামিং": "প্রোগ্রামিং বা কোডিংয়ের ক্ষেত্রে সবসময় লজিক পরিষ্কার রাখা এবং ছোট ছোট মডিউলে কাজ ভাগ করে নেওয়া বুদ্ধিমানের কাজ।",
-        "সাফল্য": "সঠিক পরিকল্পনা, নিয়মিত ফোকাস এবং হাল না ছাড়ার মানসিকতাই সফলতার মূল চাবিকাঠি।"
+        "কেমন আছো": "আলহামদুলিল্লাহ, আপনার সিস্টেম সম্পূর্ণ সচল ও সুরক্ষিত রয়েছে।",
+        "তোমার নাম কি": "আমি আপনার সিক্রেট রোবট সহকারী ও স্মার্ট কন্ট্রোল সিস্টেম।",
+        "মেনু": "মেনু অপশন থেকে আপনি রিলের সমস্ত সুইচগুলো একসাথে দেখতে ও নিয়ন্ত্রণ করতে পারবেন।"
     }
 
-    # প্যাটার্ন ম্যাচিং বা মিল খোঁজার জন্য নিজস্ব অ্যালগরিদম
     best_match = None
     highest_ratio = 0.0
-    
     for key, val in knowledge_database.items():
         ratio = difflib.SequenceMatcher(None, query_lower, key.lower()).ratio()
         if ratio > highest_ratio:
             highest_ratio = ratio
             best_match = val
 
-    # যদি কাছাকাছি কোনো ম্যাচ পাওয়া যায় অথবা নির্দিষ্ট শব্দ থাকে
     if highest_ratio > 0.35 and best_match:
         response_text = best_match
     else:
-        # যদি একদম নতুন প্রশ্ন হয়, তবে নিজস্ব লজিক থেকে ডাইনামিক পরামর্শ তৈরি করা
-        dynamic_advice_pool = [
-            f"আপনার জিজ্ঞাসित '{query}' বিষয়টি অত্যন্ত চমৎকার। সিস্টেমের অ্যানালাইসিস বলছে—ধৈর্য এবং সঠিক কর্মপরিকল্পনা নিয়ে এগিয়ে গেলে এতে দারুণ সাফল্য আসবে।",
-            f"('{query}') এর সমাধান হিসেবে আপনার সার্কিট ফ্লো এবং ডেটা লজিকগুলো আরেকবার যাচাই করে নেওয়া উচিত।",
-            f"এই পরিস্থিতির ওপর ভিত্তি করে বলব, সুনির্দিষ্ট লক্ষ্য ঠিক করে কাজ চালিয়ে যান। সিস্টেম সবসময় আপনার সাথে আছে।"
+        dynamic_advice = [
+            f"আপনার ইনপুট '{query}' সিস্টেমে রেকর্ড করা হয়েছে। লক্ষ্য ঠিক রেখে এগিয়ে চলুন!",
+            f"('{query}') এর জন্য সিস্টেমের কানেকশন ও লজিক ফ্লো যাচাই করা হচ্ছে।"
         ]
-        response_text = random.choice(dynamic_advice_pool)
+        response_text = random.choice(dynamic_advice)
 
-    # ফায়ারস্টোরের সুরক্ষিত মেমোরিতে এটি পার্মানেন্ট সেভ করা
     if db_firestore:
         try:
             db_firestore.collection('protected_memory').add({
@@ -119,9 +137,8 @@ def advanced_autonomous_processing(query):
                 "solution": response_text,
                 "timestamp": datetime.now().strftime("%Y-%m-%d %I:%M:%S %p")
             })
-            log_live_activity("MEMORY_SAVED", "ইনপুট এবং উত্তর সুরক্ষিত মেমোরিতে সফলভাবে রেকর্ড হয়েছে।")
         except Exception as e:
-            print("Firestore Error:", e)
+            print(e)
 
     return response_text
 
@@ -133,12 +150,10 @@ def chat():
     if msg in ["ping_server_keep_alive", "ping_system_check"]:
         return jsonify({"reply": "server_active"})
 
-    # ১. ডিভাইস কন্ট্রোল কমান্ড চেক করা
     system_reply = smart_system_manager(msg)
     if system_reply:
         return jsonify({"reply": system_reply})
 
-    # ২. নিজস্ব ইন্ডিপেন্ডেন্ট প্রসেসিং ইঞ্জিন থেকে উত্তর নেওয়া
     ai_reply = advanced_autonomous_processing(msg)
     return jsonify({"reply": ai_reply})
 
