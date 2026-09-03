@@ -20,11 +20,16 @@
         .sensor-title { color: #ff0055; font-size: 15px; font-weight: bold; margin-bottom: 10px; border-bottom: 1px dashed #1e293b; padding-bottom: 5px; }
         .sensor-item { background: #1e293b; padding: 8px 12px; margin: 6px 0; border-radius: 6px; font-size: 13px; display: flex; justify-content: space-between; }
         
+        /* চ্যাট ও কমান্ড বক্স স্টাইল */
+        .chat-box { width: 100%; max-width: 400px; background: #0f172a; border: 1px solid #1e293b; border-radius: 12px; padding: 12px; margin-bottom: 15px; max-height: 150px; overflow-y: auto; font-size: 13px; text-align: left; }
+        .input-group { width: 100%; max-width: 400px; display: flex; gap: 8px; margin-bottom: 15px; }
+        .input-group input { flex: 1; background: #1e293b; border: 1px solid #00ffcc; color: #00ffcc; padding: 10px; border-radius: 8px; outline: none; }
+        .input-group button { background: #00ffcc; color: #0b0f19; border: none; padding: 10px 15px; border-radius: 8px; font-weight: bold; cursor: pointer; }
+        
         /* পপ-আপ মেনু স্টাইল (শুধু রিলের সুইচগুলো এখানে থাকবে) */
         .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); justify-content: center; align-items: center; z-index: 1000; }
         .modal-content { background: #0f172a; border: 2px solid #00ffcc; width: 90%; max-width: 350px; border-radius: 12px; padding: 20px; max-height: 80vh; overflow-y: auto; }
         .close-btn { background: #ff0055; color: white; border: none; padding: 6px 12px; border-radius: 6px; float: right; cursor: pointer; }
-        
         .relay-row { background: #1e293b; padding: 10px; margin: 8px 0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; }
     </style>
 </head>
@@ -42,7 +47,7 @@
             <button class="menu-btn" onclick="openMenu()">মেনু/লগ</button>
         </div>
         <div>🛡️ নেটওয়ার্ক: সুরক্ষিত (HTTPS)</div>
-        <div>🛰️ সার্ভার স্টেট: অনলাইন</div>
+        <div id="liveMatrixFeed">🛰️ লাইভ ফিড: সিস্টেম রিসিভিং...</div>
     </div>
 
     <!-- সেন্সর তালিকা রাখার নির্দিষ্ট মূল জায়গা -->
@@ -52,6 +57,17 @@
         <div class="sensor-item"><span>💧 আর্দ্রতা সেন্সর</span> <span style="color: #00ffcc;">৬০%</span></div>
         <div class="sensor-item"><span>🔥 গ্যাস সেন্সর</span> <span style="color: #00ffcc;">স্বাভাবিক (Safe)</span></div>
         <!-- ভবিষ্যতে নতুন সেন্সর এখানে লিস্ট আকারে যোগ করা যাবে -->
+    </div>
+
+    <!-- চ্যাট বা কমান্ড ফিড বক্স -->
+    <div class="chat-box" id="chatResponseBox">
+        <span style="color: #888;">সিস্টেমের সাথে কথোপকথন বা কমান্ড এখানে দেখা যাবে...</span>
+    </div>
+
+    <!-- কমান্ড ইনপুট বক্স -->
+    <div class="input-group">
+        <input type="text" id="userInput" placeholder="কমান্ড বা প্রশ্ন লিখুন..." onkeypress="handleKey(event)">
+        <button onclick="sendToServer()">পাঠাও</button>
     </div>
 
     <!-- শুধু রিলের সুইচযুক্ত পপ-আপ মেনু -->
@@ -96,7 +112,7 @@
     </div>
 
     <script>
-        const SERVER_URL = ""; // আপনার রেন্ডার ব্যাকএন্ড বা লাইভ সার্ভার লিংক
+        const SERVER_URL = ""; // আপনার রেন্ডার ব্যাকএন্ড বা লাইভ সার্ভার লিংক এখানে বসাবেন (যদি প্রয়োজন হয়)
 
         function openMenu() {
             document.getElementById('menuModal').style.display = 'flex';
@@ -106,9 +122,44 @@
             document.getElementById('menuModal').style.display = 'none';
         }
 
+        function handleKey(e) {
+            if (e.key === 'Enter') {
+                sendToServer();
+            }
+        }
+
+        function sendToServer() {
+            const inputField = document.getElementById('userInput');
+            const chatBox = document.getElementById('chatResponseBox');
+            const msg = inputField.value.trim();
+            if (!msg) return;
+
+            chatBox.innerHTML += `<div style="margin-top: 5px; color: #fff;">👤 আপনি: ${msg}</div>`;
+            inputField.value = '';
+
+            // ফেচ রিকোয়েস্ট ব্যাকএন্ডে পাঠানোর জন্য
+            fetch(SERVER_URL + '/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: msg })
+            })
+            .then(res => res.json())
+            .then(data => {
+                chatBox.innerHTML += `<div style="margin-top: 5px; color: #00ffcc;">🤖 এআই: ${data.reply}</div>`;
+                chatBox.scrollTop = chatBox.scrollHeight;
+            })
+            .catch(err => {
+                chatBox.innerHTML += `<div style="margin-top: 5px; color: #ff0055;">⚠️ সার্ভার কানেকশন ত্রুটি!</div>`;
+            });
+        }
+
         function toggleRelay(relayKey, status) {
-            console.log(relayKey, status ? "ON" : "OFF");
-            // ফায়ারবেস বা ব্যাকএন্ডে রিল স্টেট আপডেট করার কোড এখানে যুক্ত হবে
+            const cmd = status ? `${relayKey} চালু করো` : `${relayKey} বন্ধ করো`;
+            fetch(SERVER_URL + '/chat', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ message: cmd })
+            }).catch(e => console.log(e));
         }
     </script>
 
