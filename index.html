@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি এআই প্রো সিস্টেম - রিয়েল-টাইম প্যাকেট মনিটর</title>
+    <title>চিঠি এআই প্রো সিস্টেম - ভিআইপি সাইবার ড্যাশবোর্ড</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -25,35 +25,46 @@
             border: 2px solid rgba(0, 255, 204, 0.3); padding: 20px; border-radius: 20px; 
             width: 100%; max-width: 480px; box-shadow: 0 0 30px rgba(0, 255, 204, 0.15); 
             background: rgba(16, 16, 26, 0.9); backdrop-filter: blur(10px);
-            max-height: 95vh; overflow-y: auto;
+            max-height: 95vh; overflow-y: auto; position: relative;
         }
-        h2 { font-size: 22px; margin-bottom: 10px; text-shadow: 0 0 10px #00ffcc; }
+
+        /* হেডার ও নোটিফিকেশন বেল স্টাইল */
+        .header-bar {
+            display: flex; justify-content: space-between; align-items: center;
+            border-bottom: 1px solid rgba(0, 255, 204, 0.2); padding-bottom: 8px; margin-bottom: 12px;
+        }
+        .notif-bell-container { position: relative; cursor: pointer; font-size: 20px; }
+        .notif-badge {
+            position: absolute; top: -5px; right: -8px; background: #ff0055; color: #fff;
+            border-radius: 50%; padding: 2px 5px; font-size: 10px; font-weight: bold;
+        }
+        .notif-dropdown {
+            display: none; position: absolute; top: 35px; right: 0; background: #0c182b;
+            border: 1px solid #00ffcc; width: 260px; max-height: 220px; overflow-y: auto;
+            z-index: 1000; border-radius: 8px; text-align: left; padding: 10px; box-shadow: 0 0 15px #000;
+        }
+        .notif-item { font-size: 11px; padding: 6px 0; border-bottom: 1px solid rgba(0, 255, 204, 0.1); word-break: break-all; }
+        .notif-item.danger { color: #ff3333; font-weight: bold; }
+        .notif-item.warning { color: #ffcc00; }
+
+        /* লকডাউন ব্যানার */
+        #lockdownBanner {
+            display: none; background: #ff0033; color: #fff; padding: 10px; border-radius: 8px;
+            font-size: 12px; font-weight: bold; margin-bottom: 10px; animation: blink 1s infinite;
+        }
+
+        h2 { font-size: 20px; text-shadow: 0 0 10px #00ffcc; }
         #robotFace { background: #000; border: 2px solid #00ffcc; border-radius: 15px; margin: 10px auto; display: block; }
         #reply { margin: 10px 0; min-height: 45px; font-size: 14px; line-height: 1.4; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
         
         .retro-monitor {
-            background: #0b1a14;
-            border: 2px solid #00ffcc;
-            border-radius: 8px;
-            padding: 8px 12px;
-            margin: 10px 0;
-            font-family: 'Courier New', Courier, monospace;
-            text-align: left;
-            box-shadow: inset 0 0 10px rgba(0, 255, 204, 0.3);
-            position: relative;
+            background: #0b1a14; border: 2px solid #00ffcc; border-radius: 8px; padding: 8px 12px;
+            margin: 10px 0; font-family: 'Courier New', Courier, monospace; text-align: left;
+            box-shadow: inset 0 0 10px rgba(0, 255, 204, 0.3); position: relative;
         }
         .monitor-header { font-size: 11px; color: #00aa88; border-bottom: 1px dashed #005544; padding-bottom: 3px; margin-bottom: 5px; display: flex; justify-content: space-between; align-items: center; }
         
-        .menu-btn {
-            background: #00ffcc;
-            color: #000;
-            border: none;
-            padding: 2px 6px;
-            font-size: 10px;
-            font-weight: bold;
-            border-radius: 4px;
-            cursor: pointer;
-        }
+        .menu-btn { background: #00ffcc; color: #000; border: none; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         .menu-btn:hover { background: #ff0055; color: #fff; }
 
         .monitor-body { font-size: 12px; color: #00ffcc; line-height: 1.4; }
@@ -62,26 +73,13 @@
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
         #trafficModal {
-            display: none;
-            position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
-            background: rgba(5, 5, 14, 0.95);
-            z-index: 999;
-            justify-content: center;
-            align-items: center;
-            padding: 20px;
+            display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(5, 5, 14, 0.95); z-index: 999; justify-content: center; align-items: center; padding: 20px;
         }
         .modal-content {
-            background: #0b1a14;
-            border: 2px solid #00ffcc;
-            border-radius: 12px;
-            width: 100%; max-width: 420px;
-            padding: 15px;
-            font-family: 'Courier New', Courier, monospace;
-            text-align: left;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3);
-            max-height: 85vh;
-            overflow-y: auto;
+            background: #0b1a14; border: 2px solid #00ffcc; border-radius: 12px; width: 100%; max-width: 420px;
+            padding: 15px; font-family: 'Courier New', Courier, monospace; text-align: left;
+            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3); max-height: 85vh; overflow-y: auto;
         }
         .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #005544; padding-bottom: 5px; margin-bottom: 10px; font-size: 13px; color: #00ffcc; }
         .close-btn { background: #ff0055; color: #fff; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
@@ -92,13 +90,8 @@
         
         .switches-list { display: flex; flex-direction: column; gap: 10px; margin: 15px 0; }
         .switch-card {
-            background: rgba(24, 24, 42, 0.8);
-            border: 1px solid rgba(0, 255, 204, 0.4);
-            padding: 12px 15px;
-            border-radius: 12px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
+            background: rgba(24, 24, 42, 0.8); border: 1px solid rgba(0, 255, 204, 0.4); padding: 12px 15px;
+            border-radius: 12px; display: flex; align-items: center; justify-content: space-between;
         }
         .switch-label { font-size: 14px; font-weight: bold; color: #fff; }
 
@@ -124,7 +117,20 @@
 <body>
 
     <div class="box">
-        <h2>🤖 চিঠি এআই প্রো সিস্টেম</h2>
+        <!-- টপ বার নোটিফিকেশন বেলসহ -->
+        <div class="header-bar">
+            <h2>🤖 চিঠি এআই প্রো</h2>
+            <div class="notif-bell-container" onclick="toggleNotifPanel()">
+                🔔 <span id="notifBadge" class="notif-badge">0</span>
+                <div id="notifDropdown" class="notif-dropdown">
+                    <div style="font-weight:bold; margin-bottom:5px; border-bottom:1px solid #00ffcc;">নোটিফিকেশন প্যানেল</div>
+                    <div id="notifContent">কোনো নতুন বার্তা নেই।</div>
+                </div>
+            </div>
+        </div>
+
+        <div id="lockdownBanner">🚨 সিকিউরিটি লকডাউন এক্টিভেটেড! সার্ভার সুরক্ষিত ও লক রাখা হয়েছে।</div>
+
         <canvas id="robotFace" width="260" height="80"></canvas>
         <div id="reply">সিস্টেম ও প্যাকেট ট্র্যাকিং সক্রিয় রয়েছে।</div>
 
@@ -155,9 +161,6 @@
                 <div class="traffic-log" id="trafficLogContainer">
                     <div class="log-entry">[সিস্টেম] ম্যাট্রিক্স মনিটর ইনিশিয়ালাইজড...</div>
                 </div>
-                <div style="font-size: 10px; margin-top: 8px; color: #aaa;">
-                    🔒 সুরক্ষিত বুদ্ধির ভাণ্ডার ও লোকাল মেমোরি ভেরিফাইড।
-                </div>
             </div>
         </div>
 
@@ -178,6 +181,47 @@
     <script>
         const firebaseConfig = { databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com" };
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
+
+        let notifCount = 0;
+        function toggleNotifPanel() {
+            const dropdown = document.getElementById('notifDropdown');
+            dropdown.style.display = (dropdown.style.display === 'block') ? 'none' : 'block';
+        }
+
+        // ৩-৪ সেকেন্ডের সফট মাইল্ড অ্যালার্ম সাউন্ড প্লেয়ার
+        function playMildAlarm() {
+            try {
+                const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                const osc = audioCtx.createOscillator();
+                const gain = audioCtx.createGain();
+
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(440, audioCtx.currentTime);
+                gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+
+                osc.connect(gain);
+                gain.connect(audioCtx.destination);
+
+                osc.start();
+                setTimeout(() => { osc.stop(); }, 4000); // ঠিক ৪ সেকেন্ড পর অটো মিউট
+            } catch(e){}
+        }
+
+        function addWebNotification(title, msg, type = "info") {
+            notifCount++;
+            document.getElementById('notifBadge').innerText = notifCount;
+            const container = document.getElementById('notifContent');
+            
+            if (notifCount === 1) container.innerHTML = "";
+            const item = document.createElement('div');
+            item.className = `notif-item ${type}`;
+            item.innerHTML = `<strong>${title}</strong>: ${msg}`;
+            container.prepend(item);
+
+            if (type === 'warning' || type === 'danger') {
+                playMildAlarm();
+            }
+        }
 
         setInterval(() => {
             const now = new Date();
@@ -234,14 +278,13 @@
                     checkbox.checked = (status === "ON"); 
                     document.getElementById('monitorSig').innerText = "রিসিভড (ওকে)";
                     document.getElementById('monitorSig').className = "status-safe";
-                    addTrafficLog(`ফায়ারবেস সিঙ্ক: ${key} এর বর্তমান অবস্থা [${status}]`);
                 }
             }, function(error) {
                 document.getElementById('monitorSig').innerText = "প্যাকেট ড্রপ!";
                 document.getElementById('monitorSig').className = "status-alert";
                 document.getElementById('monitorThreat').innerText = "অস্বাভাবিক ইন্টারসেপ্ট!";
                 document.getElementById('monitorThreat').className = "status-alert";
-                addTrafficLog(`ফায়ারবেস এরর: ${key} সিঙ্ক করতে সমস্যা হয়েছে`, true);
+                addWebNotification("সিকিউরিটি এলার্ট", "ফায়ারবেস ডাটাবেসে কানেকশন ড্রপ করেছে!", "warning");
             });
         }
 
@@ -346,17 +389,31 @@
                 let res = await fetch(SERVER_URL, {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({ message: msg })
+                    body: JSON.stringify({ message: msg, user_role: "MEMBER" }) // ডিফল্ট রোল ফ্যামিলি মেম্বার
                 });
 
                 let data = await res.json();
+
+                if (data.status === "SERVER_TERMINATED") {
+                    document.getElementById('lockdownBanner').style.display = 'block';
+                    addWebNotification("🚨 সিকিউরিটি রেড থ্রেট!", "হ্যাকিং চেষ্টার অভিযোগে সার্ভার অটো কিলসুইচ ডাউন করা হয়েছে!", "danger");
+                    replyDiv.innerText = "সিস্টেম লকডাউন অবস্থায় রয়েছে!";
+                    return;
+                }
+
                 let aiReply = data.reply || "উত্তর পাওয়া যায়নি।";
                 replyDiv.innerText = aiReply;
+                
+                if (data.alert_type) {
+                    addWebNotification("সিস্টেম নোটিফিকেশন", aiReply, data.alert_type);
+                }
+
                 addTrafficLog(`এআই রেসপন্স সফল: "${aiReply.substring(0, 30)}..."`);
                 speakText(aiReply);
             } catch (err) {
                 replyDiv.innerText = "সংযোগের সমস্যা হয়েছে!";
-                addTrafficLog("সার্ভার কানেকشن এরর!", true);
+                addTrafficLog("সার্ভার কানেকশন এরর!", true);
+                addWebNotification("কানেকশন এরর", "সার্ভারে রেসপন্স পাওয়া যাচ্ছে না", "warning");
                 eyeState = 'idle';
             }
         }
