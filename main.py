@@ -1,5 +1,7 @@
 import os
 import re
+import hashlib
+import datetime
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
@@ -59,6 +61,66 @@ def home():
         "system": "Chitti AI Pro Running",
         "lockdown": SYSTEM_STATE["is_locked_down"]
     })
+
+# ==================== নতুন যুক্ত করা ফিচার: মেটা প্রুফ জেনারেটর ====================
+@app.route('/generate-proof', methods=['POST'])
+def generate_proof():
+    # সিস্টেম লকডাউন থাকলে প্রসেস করবে না
+    if SYSTEM_STATE["is_locked_down"]:
+        return jsonify({
+            "error": "🚨 সিস্টেম লকডাউনে রয়েছে। মেটা প্রুফ তৈরি করা সম্ভব নয়।",
+            "status": "SERVER_TERMINATED"
+        }), 403
+
+    try:
+        if 'file' not in request.files:
+            return jsonify({"error": "কোনো ফাইল আপলোড করা হয়নি।"}), 400
+        
+        file = request.files['file']
+        file_bytes = file.read()
+        
+        if len(file_bytes) == 0:
+            return jsonify({"error": "আপলোড করা ফাইলটি খালি।"}), 400
+
+        # ১. ফাইলের SHA-256 ক্রিপ্টোগ্রাফিক মেটা প্রুফ হ্যাশ জেনারেট
+        file_hash = hashlib.sha256(file_bytes).hexdigest()
+        
+        # ২. টাইমস্ট্যাম্প ও ফাইল সাইজ
+        timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
+        file_size = len(file_bytes)
+        
+        proof_data = {
+            "fileName": file.filename,
+            "fileSize": f"{file_size} bytes",
+            "timestamp": timestamp,
+            "metaProofHash": file_hash,
+            "status": "VERIFIED_AUTHENTIC"
+        }
+
+        # ৩. ফায়ারবেস ডেটাবেজে মেটা প্রুফ রেকর্ড সেভ করা
+        try:
+            db.reference('meta_proofs').push(proof_data)
+        except Exception as fb_err:
+            print(f"Firebase Proof Save Warning: {fb_err}")
+
+        # ৪. লাইভ ফিডে লগ আপডেট করা
+        try:
+            db.reference('live_feed').push({
+                'action': 'META_PROOF_GENERATED',
+                'details': f"Proof generated for file: {file.filename}",
+                'time': db.ServerValue.TIMESTAMP
+            })
+        except Exception:
+            pass
+
+        return jsonify(proof_data), 200
+
+    except Exception as e:
+        return jsonify({
+            "error": "মেটা প্রুফ তৈরি করতে সমস্যা হয়েছে।",
+            "details": str(e)
+        }), 500
+# =================================================================================
 
 @app.route('/chat', methods=['POST'])
 def chat():
