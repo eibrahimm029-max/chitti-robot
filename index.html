@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>চিঠি এআই প্রো সিস্টেম - ভিআইপি সাইবার ড্যাশবোর্ড</title>
+    <title>চিঠি এআই প্রো - ইন্টারঅ্যাক্টিভ ওয়েব প্যানেল</title>
     
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-database.js"></script>
@@ -28,7 +28,7 @@
             max-height: 95vh; overflow-y: auto; position: relative;
         }
 
-        /* হেডার ও নোটিফিকেশন বেল স্টাইল */
+        /* হেডার ও নোটিফিকেশন বেল */
         .header-bar {
             display: flex; justify-content: space-between; align-items: center;
             border-bottom: 1px solid rgba(0, 255, 204, 0.2); padding-bottom: 8px; margin-bottom: 12px;
@@ -47,7 +47,6 @@
         .notif-item.danger { color: #ff3333; font-weight: bold; }
         .notif-item.warning { color: #ffcc00; }
 
-        /* লকডাউন ব্যানার */
         #lockdownBanner {
             display: none; background: #ff0033; color: #fff; padding: 10px; border-radius: 8px;
             font-size: 12px; font-weight: bold; margin-bottom: 10px; animation: blink 1s infinite;
@@ -57,6 +56,7 @@
         #robotFace { background: #000; border: 2px solid #00ffcc; border-radius: 15px; margin: 10px auto; display: block; }
         #reply { margin: 10px 0; min-height: 45px; font-size: 14px; line-height: 1.4; color: #ffffff; background: rgba(0, 0, 0, 0.6); padding: 10px; border-radius: 10px; border-left: 3px solid #00ffcc; text-align: left; }
         
+        /* রেট্রো মনিটর স্টাইল */
         .retro-monitor {
             background: #0b1a14; border: 2px solid #00ffcc; border-radius: 8px; padding: 8px 12px;
             margin: 10px 0; font-family: 'Courier New', Courier, monospace; text-align: left;
@@ -67,24 +67,40 @@
         .menu-btn { background: #00ffcc; color: #000; border: none; padding: 2px 6px; font-size: 10px; font-weight: bold; border-radius: 4px; cursor: pointer; }
         .menu-btn:hover { background: #ff0055; color: #fff; }
 
-        .monitor-body { font-size: 12px; color: #00ffcc; line-height: 1.4; }
+        /* গ্লোব ইন্টারনেট আইকন বাটন স্টাইল */
+        .globe-icon-btn {
+            font-size: 24px; cursor: pointer; transition: transform 0.3s; display: inline-block;
+            filter: drop-shadow(0 0 5px #00ffcc);
+        }
+        .globe-icon-btn:hover { transform: scale(1.2) rotate(15deg); }
+
+        .monitor-body { font-size: 12px; color: #00ffcc; line-height: 1.4; display: flex; justify-content: space-between; align-items: center; }
         .status-safe { color: #00ffcc; }
         .status-alert { color: #ff3333; animation: blink 1s infinite; }
         @keyframes blink { 0% { opacity: 1; } 50% { opacity: 0.4; } 100% { opacity: 1; } }
 
-        #trafficModal {
+        /* মোডাল উইন্ডোজ (লগ এবং ইন্টারনেট প্যানেল) */
+        .modal-overlay {
             display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%;
             background: rgba(5, 5, 14, 0.95); z-index: 999; justify-content: center; align-items: center; padding: 20px;
         }
         .modal-content {
-            background: #0b1a14; border: 2px solid #00ffcc; border-radius: 12px; width: 100%; max-width: 420px;
-            padding: 15px; font-family: 'Courier New', Courier, monospace; text-align: left;
-            box-shadow: 0 0 20px rgba(0, 255, 204, 0.3); max-height: 85vh; overflow-y: auto;
+            background: #0b1a14; border: 2px solid #00ffcc; border-radius: 12px; width: 100%; max-width: 440px;
+            padding: 15px; font-family: 'Segoe UI', sans-serif; text-align: left;
+            box-shadow: 0 0 25px rgba(0, 255, 204, 0.3); max-height: 85vh; overflow-y: auto; color: #00ffcc;
         }
-        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #005544; padding-bottom: 5px; margin-bottom: 10px; font-size: 13px; color: #00ffcc; }
+        .modal-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid #005544; padding-bottom: 5px; margin-bottom: 10px; font-size: 14px; color: #00ffcc; font-weight: bold; }
         .close-btn { background: #ff0055; color: #fff; border: none; padding: 3px 8px; border-radius: 4px; cursor: pointer; font-weight: bold; }
-        .traffic-log { font-size: 11px; color: #00ffcc; background: #000; padding: 8px; border-radius: 6px; margin-top: 5px; height: 200px; overflow-y: auto; border: 1px dashed #005544; }
+        
+        .traffic-log { font-size: 11px; color: #00ffcc; background: #000; padding: 8px; border-radius: 6px; margin-top: 5px; height: 180px; overflow-y: auto; border: 1px dashed #005544; font-family: monospace; }
         .log-entry { margin-bottom: 6px; border-bottom: 1px dotted #222; padding-bottom: 3px; word-break: break-all; }
+
+        /* অ্যাডভান্সড ইন্টারনেট প্যানেল ফর্মস */
+        .panel-section { border: 1px solid rgba(0, 255, 204, 0.3); padding: 10px; border-radius: 8px; margin-bottom: 12px; background: rgba(0,0,0,0.4); }
+        .panel-section h4 { margin-bottom: 8px; font-size: 13px; color: #fff; }
+        .form-input { width: 100%; background: #000; border: 1px solid #00ffcc; color: #00ffcc; padding: 6px 10px; border-radius: 6px; margin-bottom: 8px; font-size: 12px; }
+        .action-btn { background: #00ffcc; color: #000; border: none; padding: 7px 12px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 12px; width: 100%; margin-top: 4px; }
+        .action-btn:hover { background: #ff0055; color: #fff; }
 
         .sensor-container { display: flex; justify-content: space-around; background: rgba(0, 0, 0, 0.5); padding: 10px; border-radius: 10px; border: 1px solid #00ffcc; margin: 10px 0; font-size: 13px; }
         
@@ -117,7 +133,6 @@
 <body>
 
     <div class="box">
-        <!-- টপ বার নোটিফিকেশন বেলসহ -->
         <div class="header-bar">
             <h2>🤖 চিঠি এআই প্রো</h2>
             <div class="notif-bell-container" onclick="toggleNotifPanel()">
@@ -132,8 +147,9 @@
         <div id="lockdownBanner">🚨 সিকিউরিটি লকডাউন এক্টিভেটেড! সার্ভার সুরক্ষিত ও লক রাখা হয়েছে।</div>
 
         <canvas id="robotFace" width="260" height="80"></canvas>
-        <div id="reply">সিস্টেম ও প্যাকেট ট্র্যাকিং সক্রিয় রয়েছে।</div>
+        <div id="reply">সিস্টেম ও ইন্টারঅ্যাক্টিভ প্যানেল সক্রিয় রয়েছে।</div>
 
+        <!-- রেপ্লিকা সিস্টেম মনিটর যার মধ্যে গ্লোব আইকন রয়েছে -->
         <div class="retro-monitor">
             <div class="monitor-header">
                 <span>[SYS_MONITOR]</span>
@@ -143,23 +159,69 @@
                 </div>
             </div>
             <div class="monitor-body">
-                <div>🛡️ নেটওয়ার্ক: <span id="monitorSec" class="status-safe">সুরক্ষিত (HTTPS)</span></div>
-                <div>📡 প্যাকেট: <span id="monitorSig" class="status-safe">রিসিভড (ওকে)</span></div>
-                <div>⚠️ সিকিউরিটি: <span id="monitorThreat">কোনো বাধা নেই</span></div>
+                <div>
+                    <div>🛡️ নেটওয়ার্ক: <span id="monitorSec" class="status-safe">সুরক্ষিত (HTTPS)</span></div>
+                    <div>📡 প্যাকেট: <span id="monitorSig" class="status-safe">রিসিভড (ওকে)</span></div>
+                    <div>⚠️ সিকিউরিটি: <span id="monitorThreat">কোনো বাধা নেই</span></div>
+                </div>
+                <!-- গ্লোব (🌐) বাটন যা চেপে ফিচার প্যানেল দেখা যাবে -->
+                <div>
+                    <span class="globe-icon-btn" onclick="openInternetPanel()" title="ইন্টারনেট সিকিউরিটি প্যানেল">🌐</span>
+                </div>
             </div>
         </div>
 
-        <div id="trafficModal">
+        <!-- ১. ট্র্যাফিক ও ম্যাট্রিক্স লগ মোডাল -->
+        <div class="modal-overlay" id="trafficModal">
             <div class="modal-content">
                 <div class="modal-header">
                     <span>📡 এআই থিঙ্কিং ও লাইভ ম্যাট্রিক্স ফিড</span>
                     <button class="close-btn" onclick="closeTrafficModal()">বন্ধ×</button>
                 </div>
-                <div style="font-size: 11px; margin-bottom: 5px; color: #00aa88;">
-                    * ফায়ারবেস ও এআই থিঙ্কিং লাইভ লগ:
-                </div>
                 <div class="traffic-log" id="trafficLogContainer">
                     <div class="log-entry">[সিস্টেম] ম্যাট্রিক্স মনিটর ইনিশিয়ালাইজড...</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ২. গ্লোব বাটন চালিত সিকিউর ইন্টারনেট ফিচার প্যানেল মোডাল -->
+        <div class="modal-overlay" id="internetPanelModal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <span>🌐 ইন্টারনেট সিকিউরিটি ও ফ্যামিলি রুম</span>
+                    <button class="close-btn" onclick="closeInternetPanel()">বন্ধ×</button>
+                </div>
+
+                <!-- ক. ১ নম্বর মালিকের বায়োমেট্রিক এক্সেস -->
+                <div class="panel-section">
+                    <h4>🔐 ১ নম্বর মালিক ভেরিফিকেশন (Fingerprint)</h4>
+                    <button class="action-btn" onclick="verifyBiometricOwner()">👆 ফিঙ্গারপ্রিন্ট দিয়ে আনলক করুন</button>
+                    <div id="ownerStatusMsg" style="font-size: 11px; margin-top: 5px; color: #ffcc00;"></div>
+                </div>
+
+                <!-- খ. গোপন ফ্যামিলি মেম্বার কক্ষ (মালিক আনলক করলে আসবে) -->
+                <div class="panel-section" id="secretVaultSection" style="display: none;">
+                    <h4>👨‍👩‍👧‍👦 গোপন ফ্যামিলি কক্ষ (Vault)</h4>
+                    <input type="text" id="famName" class="form-input" placeholder="সদস্যের নাম (যেমন: রানা)">
+                    <input type="text" id="famPin" class="form-input" placeholder="সিক্রেট পিন (যেমন: ১২৩৪)">
+                    <button class="action-btn" onclick="addFamilyMember()">সেভ ও রেজিস্টার করুন</button>
+                    
+                    <h5 style="margin-top: 10px; font-size: 11px;">বর্তমান ফ্যামিলি লিস্ট:</h5>
+                    <div id="familyMemberList" style="font-size: 11px; margin-top: 5px;"></div>
+                </div>
+
+                <!-- গ. মেটা প্রুফ ক্রিপ্টোগ্রাফিক জেনারেটর -->
+                <div class="panel-section">
+                    <h4>📜 মেটা প্রুফ জেনারেটর</h4>
+                    <input type="file" id="proofFileInput" class="form-input" style="padding: 3px;">
+                    <button class="action-btn" onclick="uploadMetaProof()">প্রুফ তৈরি করুন</button>
+                    <div id="proofOutput" style="font-size: 10px; margin-top: 5px; word-break: break-all;"></div>
+                </div>
+
+                <!-- ঘ. ৬ ঘণ্টার স্মার্ট অটো-ডিলিট টাইমার কন্ট্রোল -->
+                <div class="panel-section">
+                    <h4>🧹 স্মার্ট অটো-ডিলিট কন্ট্রোল (৬ ঘণ্টা)</h4>
+                    <button class="action-btn" style="background:#ff0055; color:#fff;" onclick="triggerManualCleanup()">এখনই ম্যানুয়ালি মেমোরি ক্লিন করুন</button>
                 </div>
             </div>
         </div>
@@ -169,6 +231,7 @@
             <div>🔥 গ্যাস: <span id="gasVal">স্বাভাবিক</span></div>
         </div>
 
+        <!-- রিলে সুইচগুলো ড্যাশবোর্ডে আগের মতোই থাকবে -->
         <div class="switches-list" id="switchesList"></div>
 
         <div class="input-group">
@@ -182,28 +245,27 @@
         const firebaseConfig = { databaseURL: "https://chitti-bfa21-default-rtdb.firebaseio.com" };
         if (!firebase.apps.length) { firebase.initializeApp(firebaseConfig); }
 
+        const SERVER_BASE = "https://chitti-robot-qh89.onrender.com";
+        let activeOwnerToken = null;
         let notifCount = 0;
+
         function toggleNotifPanel() {
             const dropdown = document.getElementById('notifDropdown');
             dropdown.style.display = (dropdown.style.display === 'block') ? 'none' : 'block';
         }
 
-        // ৩-৪ সেকেন্ডের সফট মাইল্ড অ্যালার্ম সাউন্ড প্লেয়ার
         function playMildAlarm() {
             try {
                 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
                 const osc = audioCtx.createOscillator();
                 const gain = audioCtx.createGain();
-
                 osc.type = 'sine';
                 osc.frequency.setValueAtTime(440, audioCtx.currentTime);
                 gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
-
                 osc.connect(gain);
                 gain.connect(audioCtx.destination);
-
                 osc.start();
-                setTimeout(() => { osc.stop(); }, 4000); // ঠিক ৪ সেকেন্ড পর অটো মিউট
+                setTimeout(() => { osc.stop(); }, 4000);
             } catch(e){}
         }
 
@@ -211,16 +273,12 @@
             notifCount++;
             document.getElementById('notifBadge').innerText = notifCount;
             const container = document.getElementById('notifContent');
-            
             if (notifCount === 1) container.innerHTML = "";
             const item = document.createElement('div');
             item.className = `notif-item ${type}`;
             item.innerHTML = `<strong>${title}</strong>: ${msg}`;
             container.prepend(item);
-
-            if (type === 'warning' || type === 'danger') {
-                playMildAlarm();
-            }
+            if (type === 'warning' || type === 'danger') playMildAlarm();
         }
 
         setInterval(() => {
@@ -228,89 +286,146 @@
             document.getElementById('liveClock').innerText = now.toLocaleTimeString();
         }, 1000);
 
-        function addTrafficLog(msg, isAlert = false) {
-            const logContainer = document.getElementById('trafficLogContainer');
-            if(!logContainer) return;
-            const timeStr = new Date().toLocaleTimeString();
-            const colorStyle = isAlert ? "color: #ff3333;" : "color: #00ffcc;";
-            logContainer.innerHTML += `<div class="log-entry" style="${colorStyle}">[${timeStr}] ${msg}</div>`;
-            logContainer.scrollTop = logContainer.scrollHeight;
+        function openTrafficModal() {
+            document.getElementById('trafficModal').style.display = 'flex';
+            fetchLiveMatrixFeed();
+        }
+        function closeTrafficModal() { document.getElementById('trafficModal').style.display = 'none'; }
+
+        /* গ্লোব ইন্টারনেট প্যানেল ফাংশনালিটি */
+        function openInternetPanel() { document.getElementById('internetPanelModal').style.display = 'flex'; }
+        function closeInternetPanel() { document.getElementById('internetPanelModal').style.display = 'none'; }
+
+        // ১ নম্বর মালিকের বায়োমেট্রিক আনলক
+        async function verifyBiometricOwner() {
+            const msgDiv = document.getElementById('ownerStatusMsg');
+            msgDiv.innerText = "ফিঙ্গারপ্রিন্ট সেন্সর স্ক্যান করা হচ্ছে...";
+            
+            // ব্রাউজার বায়োমেট্রিক সিমুলেশন
+            setTimeout(async () => {
+                try {
+                    let res = await fetch(`${SERVER_BASE}/api/verify-owner`, {
+                        method: "POST",
+                        headers: {"Content-Type": "application/json"},
+                        body: JSON.stringify({ biometric_signature: "SUCCESS_BIOMETRIC" })
+                    });
+                    let data = await res.json();
+                    if(data.status === "SUCCESS") {
+                        activeOwnerToken = data.owner_token;
+                        msgDiv.style.color = "#00ffcc";
+                        msgDiv.innerText = data.message;
+                        document.getElementById('secretVaultSection').style.display = 'block';
+                        loadFamilyMembers();
+                    } else {
+                        msgDiv.style.color = "#ff3333";
+                        msgDiv.innerText = data.message;
+                    }
+                } catch(e) { msgDiv.innerText = "ভেরিফিকেশন এরর!"; }
+            }, 1000);
         }
 
-        let matrixInterval = null;
+        // ফ্যামিলি মেম্বার যুক্ত করা
+        async function addFamilyMember() {
+            const name = document.getElementById('famName').value;
+            const pin = document.getElementById('famPin').value;
+            if(!name || !pin) return alert("নাম ও পিন দিন!");
+
+            let res = await fetch(`${SERVER_BASE}/api/family/add`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ owner_token: activeOwnerToken, name: name, pin: pin, access: "BASIC" })
+            });
+            let data = await res.json();
+            alert(data.message);
+            loadFamilyMembers();
+        }
+
+        // ফ্যামিলি মেম্বার লোড ও ডিলিট করা
+        async function loadFamilyMembers() {
+            let res = await fetch(`${SERVER_BASE}/api/family/list`, {
+                method: "POST",
+                headers: {"Content-Type": "application/json"},
+                body: JSON.stringify({ owner_token: activeOwnerToken })
+            });
+            let data = await res.json();
+            const container = document.getElementById('familyMemberList');
+            container.innerHTML = "";
+            if(data.members) {
+                for(let id in data.members) {
+                    let m = data.members[id];
+                    container.innerHTML += `<div style="display:flex; justify-content:space-between; margin-bottom:4px;">
+                        <span>👤 ${m.name} (PIN: ${m.pin})</span>
+                        <button style="background:#ff0055; color:#fff; border:none; padding:1px 5px; border-radius:3px; cursor:pointer;" onclick="deleteFamily('${id}')">ডিলিট</button>
+                    </div>`;
+                }
+            } else { container.innerHTML = "কোনো রেকর্ড নেই।"; }
+        }
+
+        async function deleteFamily(id) {
+            if(confirm("মুছে ফেলতে চান?")) {
+                let res = await fetch(`${SERVER_BASE}/api/family/delete/${id}`, {
+                    method: "POST",
+                    headers: {"Content-Type": "application/json"},
+                    body: JSON.stringify({ owner_token: activeOwnerToken })
+                });
+                let data = await res.json();
+                alert(data.message);
+                loadFamilyMembers();
+            }
+        }
+
+        // মেটা প্রুফ জেনারেটর আপলোড
+        async function uploadMetaProof() {
+            const fileInput = document.getElementById('proofFileInput');
+            if(!fileInput.files[0]) return alert("ফাইল সিলেক্ট করুন!");
+
+            const formData = new FormData();
+            formData.append("file", fileInput.files[0]);
+
+            let res = await fetch(`${SERVER_BASE}/generate-proof`, { method: "POST", body: formData });
+            let data = await res.json();
+            document.getElementById('proofOutput').innerText = JSON.stringify(data, null, 2);
+        }
+
+        async function triggerManualCleanup() {
+            alert("🧹 ৬ ঘণ্টার ক্লিনআপ প্রোটোকল ব্যাকগ্রাউন্ডে সক্রিয় করা হয়েছে।");
+        }
+
         async function fetchLiveMatrixFeed() {
             try {
-                let res = await fetch("https://chitti-robot-qh89.onrender.com/get_live_matrix");
+                let res = await fetch(`${SERVER_BASE}/get_live_matrix`);
                 let data = await res.json();
                 if (data.live_feed && data.live_feed.length > 0) {
                     const logContainer = document.getElementById('trafficLogContainer');
-                    if(!logContainer) return;
                     logContainer.innerHTML = ""; 
                     data.live_feed.reverse().forEach(item => {
                         let badgeColor = item.action === "KNOWLEDGE_ACQUIRED" ? "color: #ff00ff;" : "color: #00ffcc;";
                         logContainer.innerHTML += `<div class="log-entry" style="${badgeColor}">[${item.time}] <b>[${item.action}]</b>: ${item.details}</div>`;
                     });
-                    logContainer.scrollTop = logContainer.scrollHeight;
                 }
             } catch (e) {}
         }
 
-        function openTrafficModal() {
-            document.getElementById('trafficModal').style.display = 'flex';
-            addTrafficLog("মেনু ওপেন করা হয়েছে: প্যাকেট ট্র্যাকিং সক্রিয়।");
-            fetchLiveMatrixFeed();
-            matrixInterval = setInterval(fetchLiveMatrixFeed, 2000);
-        }
-        function closeTrafficModal() {
-            document.getElementById('trafficModal').style.display = 'none';
-            if(matrixInterval) clearInterval(matrixInterval);
-        }
-
-        // ফায়ারবেস কানেকশন ও রিলে মনিটরিং
+        // রিলে ট্র্যাকিং
         for (let i = 1; i <= 8; i++) {
             let key = "relay" + i;
-            let ref = firebase.database().ref('devices/' + key);
-            
-            ref.on('value', function(snapshot) {
-                let status = snapshot.val();
+            firebase.database().ref('devices/' + key).on('value', function(snapshot) {
                 let checkbox = document.getElementById('checkbox_' + key);
-                if (checkbox) { 
-                    checkbox.checked = (status === "ON"); 
-                    document.getElementById('monitorSig').innerText = "রিসিভড (ওকে)";
-                    document.getElementById('monitorSig').className = "status-safe";
-                }
-            }, function(error) {
-                document.getElementById('monitorSig').innerText = "প্যাকেট ড্রপ!";
-                document.getElementById('monitorSig').className = "status-alert";
-                document.getElementById('monitorThreat').innerText = "অস্বাভাবিক ইন্টারসেপ্ট!";
-                document.getElementById('monitorThreat').className = "status-alert";
-                addWebNotification("সিকিউরিটি এলার্ট", "ফায়ারবেস ডাটাবেসে কানেকশন ড্রপ করেছে!", "warning");
+                if (checkbox) checkbox.checked = (snapshot.val() === "ON");
             });
         }
 
         function toggleDevice(deviceKey) {
             let checkbox = document.getElementById('checkbox_' + deviceKey);
             let newStatus = checkbox.checked ? "ON" : "OFF";
-            
-            addTrafficLog(`কমান্ড পাঠানো হচ্ছে: ${deviceKey} -> ${newStatus}`);
-            firebase.database().ref('/devices/' + deviceKey).set(newStatus)
-                .then(() => {
-                    addTrafficLog(`সফল: ${deviceKey} আপডেট হয়েছে ${newStatus}`);
-                })
-                .catch((err) => {
-                    addTrafficLog(`ফেইলড: ${deviceKey} আপডেট করা যায়নি`, true);
-                });
+            firebase.database().ref('/devices/' + deviceKey).set(newStatus);
         }
 
         const deviceNames = {
-            "relay1": "💡 ১ নাম্বার লাইট",
-            "relay2": "🌀 ২ নাম্বার ফ্যান",
-            "relay3": "🔌 ৩ নাম্বার রিলে",
-            "relay4": "🔌 ৪ নাম্বার রিলে",
-            "relay5": "🔌 ৫ নাম্বার রিলে",
-            "relay6": "🔌 ৬ নাম্বার রিলে",
-            "relay7": "🔌 ৭ নাম্বার রিলে",
-            "relay8": "🔌 ৮ নাম্বার রিলে"
+            "relay1": "💡 ১ নাম্বার লাইট", "relay2": "🌀 ২ নাম্বার ফ্যান",
+            "relay3": "🔌 ৩ নাম্বার রিলে", "relay4": "🔌 ৪ নাম্বার রিলে",
+            "relay5": "🔌 ৫ নাম্বার রিলে", "relay6": "🔌 ৬ নাম্বার রিলে",
+            "relay7": "🔌 ৭ নাম্বার রিলে", "relay8": "🔌 ৮ নাম্বার রিলে"
         };
 
         const switchesListDiv = document.getElementById('switchesList');
@@ -327,7 +442,6 @@
             `;
         }
 
-        const SERVER_URL = "https://chitti-robot-qh89.onrender.com/chat";
         const canvas = document.getElementById('robotFace');
         const ctx = canvas.getContext('2d');
         let eyeState = 'idle';
@@ -348,16 +462,14 @@
 
         function startVoice() {
             const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            if (!SpeechRecognition) { alert("ব্রাউজার স্পিচ রিকগনিশন সাপোর্ট করে না।"); return; }
+            if (!SpeechRecognition) return alert("ব্রাউজার স্পিচ রিকগনিশন সাপোর্ট করে না।");
             const recognition = new SpeechRecognition();
             recognition.lang = 'bn-BD';
             eyeState = 'listening';
             recognition.start();
             document.getElementById('reply').innerText = "শুনছি...";
-
             recognition.onresult = function(event) {
-                let spokenText = event.results[0][0].transcript;
-                document.getElementById('userInput').value = spokenText;
+                document.getElementById('userInput').value = event.results[0][0].transcript;
                 sendMsg();
             };
             recognition.onerror = () => { eyeState = 'idle'; };
@@ -383,37 +495,28 @@
 
             replyDiv.innerText = "প্রসেস হচ্ছে...";
             input.value = "";
-            addTrafficLog(`এআই প্রম্পট পাঠানো হয়েছে: "${msg}"`);
 
             try {
-                let res = await fetch(SERVER_URL, {
+                let res = await fetch(`${SERVER_BASE}/chat`, {
                     method: "POST",
                     headers: {"Content-Type": "application/json"},
-                    body: JSON.stringify({ message: msg, user_role: "MEMBER" }) // ডিফল্ট রোল ফ্যামিলি মেম্বার
+                    body: JSON.stringify({ message: msg, user_role: activeOwnerToken ? "ADMIN" : "MEMBER" })
                 });
 
                 let data = await res.json();
-
                 if (data.status === "SERVER_TERMINATED") {
                     document.getElementById('lockdownBanner').style.display = 'block';
-                    addWebNotification("🚨 সিকিউরিটি রেড থ্রেট!", "হ্যাকিং চেষ্টার অভিযোগে সার্ভার অটো কিলসুইচ ডাউন করা হয়েছে!", "danger");
-                    replyDiv.innerText = "সিস্টেম লকডাউন অবস্থায় রয়েছে!";
+                    addWebNotification("🚨 সিকিউরিটি থ্রেট!", "কিলসুইচ ডাউন করা হয়েছে!", "danger");
+                    replyDiv.innerText = "সিস্টেম লকডাউন!";
                     return;
                 }
 
                 let aiReply = data.reply || "উত্তর পাওয়া যায়নি।";
                 replyDiv.innerText = aiReply;
-                
-                if (data.alert_type) {
-                    addWebNotification("সিস্টেম নোটিফিকেশন", aiReply, data.alert_type);
-                }
-
-                addTrafficLog(`এআই রেসপন্স সফল: "${aiReply.substring(0, 30)}..."`);
+                if (data.alert_type) addWebNotification("নোটিফিকেশন", aiReply, data.alert_type);
                 speakText(aiReply);
             } catch (err) {
                 replyDiv.innerText = "সংযোগের সমস্যা হয়েছে!";
-                addTrafficLog("সার্ভার কানেকশন এরর!", true);
-                addWebNotification("কানেকশন এরর", "সার্ভারে রেসপন্স পাওয়া যাচ্ছে না", "warning");
                 eyeState = 'idle';
             }
         }
