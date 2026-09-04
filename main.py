@@ -1,8 +1,10 @@
 import os
 import re
 import json
+import time
 import hashlib
 import datetime
+from threading import Thread
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 import firebase_admin
@@ -11,42 +13,38 @@ from firebase_admin import credentials, db
 app = Flask(__name__)
 CORS(app)
 
-# ==================== Render Environment Variables থেকে Firebase Setup ====================
+# ==================== Firebase Setup ====================
 DATABASE_URL = os.environ.get('FIREBASE_DB_URL', "https://chitti-bfa21-default-rtdb.firebaseio.com/")
 cred_json_str = os.environ.get('FIREBASE_CREDENTIALS')
 
 try:
     if not firebase_admin._apps:
         if cred_json_str:
-            # Environment Variable এর JSON স্ট্রিং থেকে Credentials পার্স করা
             cred_dict = json.loads(cred_json_str)
             cred = credentials.Certificate(cred_dict)
-            firebase_admin.initialize_app(cred, {
-                'databaseURL': DATABASE_URL
-            })
-            print("Firebase initialized with environment credentials successfully.")
+            firebase_admin.initialize_app(cred, {'databaseURL': DATABASE_URL})
+            print("Firebase initialized with environment credentials.")
         else:
-            # যদি খেয়ালবশত Environment Variable না থাকে
-            firebase_admin.initialize_app(options={
-                'databaseURL': DATABASE_URL
-            })
+            firebase_admin.initialize_app(options={'databaseURL': DATABASE_URL})
             print("Firebase initialized with default URL.")
 except Exception as e:
-    print(f"Firebase Init Warning/Error: {e}")
-# =========================================================================================
+    print(f"Firebase Init Warning: {e}")
 
+# সিস্টেমে সিকিউরিটি ও ব্যাকগ্রাউন্ড সেটিংস
 SYSTEM_STATE = {
-    "is_locked_down": False
+    "is_locked_down": False,
+    "auto_delete_enabled": True,
+    "cleanup_interval_hours": 6
 }
 
-# ডিফল্ট কাস্টম নলেজ
+PRIMARY_OWNER_TOKEN = "VERIFIED_PRIMARY_OWNER_BIOMETRIC_TOKEN"
+
 LOCAL_KNOWLEDGE = {
     "কে তৈরি করেছে": "আমাকে ইএসপি ৩২ এবং পাইথন ব্যাকএন্ডের মাধ্যমে তৈরি করা হয়েছে।",
     "কবিতা শোনাও": "আকাশে হেলান দিয়ে পাহাড় ঘুমায়, নদীর বুকে নীল সীমানা জাগে।",
     "তুমি কি করতে পারো": "আমি আপনার বাড়ির সুইচ সামলাতে পারি, সিকিউরিটি থ্রেট আটকাতে পারি এবং নতুন তথ্য মনে রাখতে পারি।"
 }
 
-# রিলে নাম ও ফায়ারবেস কি (Key) ম্যাপিং
 RELAY_MAP = {
     "১": "relay1", "1": "relay1", "এক": "relay1", "লাইট": "relay1",
     "২": "relay2", "2": "relay2", "দুই": "relay2", "ফ্যান": "relay2",
@@ -68,6 +66,36 @@ def safe_eval_math(expression):
         return None
     return None
 
+# ==================== ব্যাকগ্রাউন্ড স্মার্ট ডিলিট টাইমার ====================
+def smart_data_cleanup():
+    try:
+        print("🧹 [SMART CLEANUP] ৬ ঘণ্টার ব্যাকগ্রাউন্ড ফিল্টারিং শুরু হচ্ছে...")
+        ref = db.reference('live_feed')
+        all_logs = ref.get() or {}
+        current_time = time.time()
+        deletion_limit = SYSTEM_STATE["cleanup_interval_hours"] * 3600
+
+        for log_id, data in all_logs.items():
+            log_time = data.get('time', 0)
+            action = str(data.get('action', ''))
+            
+            # গুরুত্বপূর্ণ সিকিউরিটি/অ্যাডমিন লগ বাদ দিয়ে সাধারণ কথা মুছে ফেলা
+            if (current_time - (log_time / 1000 if log_time > 1e11 else log_time)) > deletion_limit:
+                if not any(w in action for w in ['SECURITY', 'MASTER', 'FAMILY_ADDED', 'VIP']):
+                    db.reference(f'live_feed/{log_id}').delete()
+    except Exception as e:
+        print(f"Cleanup Error: {e}")
+
+def background_timer():
+    while True:
+        time.sleep(SYSTEM_STATE["cleanup_interval_hours"] * 3600)
+        if SYSTEM_STATE["auto_delete_enabled"]:
+            smart_data_cleanup()
+
+Thread(target=background_timer, daemon=True).start()
+
+# ==================== এন্ডপয়েন্টস ====================
+
 @app.route('/', methods=['GET'])
 def home():
     return jsonify({
@@ -76,14 +104,61 @@ def home():
         "lockdown": SYSTEM_STATE["is_locked_down"]
     })
 
-# মেটা প্রুফ জেনারেটর এন্ডপয়েন্ট
+# ১ নম্বর মালিকের বায়োমেট্রিক ভেরিফিকেশন
+@app.route('/api/verify-owner', methods=['POST'])
+def verify_owner():
+    data = request.get_json(silent=True) or {}
+    bio_signature = data.get('biometric_signature')
+    
+    if bio_signature == "SUCCESS_BIOMETRIC":
+        return jsonify({
+            "status": "SUCCESS",
+            "owner_token": PRIMARY_OWNER_TOKEN,
+            "message": "🔓 ১ নম্বর মালিকের বায়োমেট্রিক ভেরিফাইড! গোপন প্যানেল আনলক করা হয়েছে।"
+        }), 200
+    return jsonify({"status": "FAILED", "message": "🚨 বায়োমেট্রিক ভেরিফিকেশন ব্যর্থ হয়েছে!"}), 403
+
+# ফ্যামিলি মেম্বার যুক্ত করা (শুধু মালিক)
+@app.route('/api/family/add', methods=['POST'])
+def add_family():
+    data = request.get_json(silent=True) or {}
+    if data.get('owner_token') != PRIMARY_OWNER_TOKEN:
+        return jsonify({"message": "🚨 অনুমতি নেই! শুধু ১ নম্বর মালিক মেম্বার যোগ করতে পারবেন।"}), 403
+
+    name = data.get('name')
+    pin = data.get('pin')
+    access = data.get('access')
+
+    new_ref = db.reference('secret_vault/family_members').push()
+    new_ref.set({'name': name, 'pin': pin, 'access': access, 'created_at': db.ServerValue.TIMESTAMP})
+    
+    return jsonify({"message": f"✅ {name}-কে ফ্যামিলি ব্যাকআপে সেভ করা হলো।"}), 200
+
+# ফ্যামিলি মেম্বার তালিকা আনা
+@app.route('/api/family/list', methods=['POST'])
+def list_family():
+    data = request.get_json(silent=True) or {}
+    if data.get('owner_token') != PRIMARY_OWNER_TOKEN:
+        return jsonify({"message": "🚨 এক্সেস ডিনাইড!"}), 403
+
+    members = db.reference('secret_vault/family_members').get() or {}
+    return jsonify({"members": members}), 200
+
+# ফ্যামিলি মেম্বার ডিলিট
+@app.route('/api/family/delete/<member_id>', methods=['POST'])
+def delete_family(member_id):
+    data = request.get_json(silent=True) or {}
+    if data.get('owner_token') != PRIMARY_OWNER_TOKEN:
+        return jsonify({"message": "🚨 অনুমতি নেই!"}), 403
+
+    db.reference(f'secret_vault/family_members/{member_id}').delete()
+    return jsonify({"message": "🗑️ সদস্যকে সফলভাবে মুছে ফেলা হয়েছে।"}), 200
+
+# মেটা প্রুফ জেনারেটর
 @app.route('/generate-proof', methods=['POST'])
 def generate_proof():
     if SYSTEM_STATE["is_locked_down"]:
-        return jsonify({
-            "error": "🚨 সিস্টেম লকডাউনে রয়েছে। মেটা প্রুফ তৈরি করা সম্ভব নয়।",
-            "status": "SERVER_TERMINATED"
-        }), 403
+        return jsonify({"error": "🚨 সিস্টেম লকডাউনে রয়েছে।", "status": "SERVER_TERMINATED"}), 403
 
     try:
         if 'file' not in request.files:
@@ -93,95 +168,56 @@ def generate_proof():
         file_bytes = file.read()
         
         if len(file_bytes) == 0:
-            return jsonify({"error": "আপলোড করা ফাইলটি খালি।"}), 400
+            return jsonify({"error": "ফাইলটি খালি।"}), 400
 
-        # ১. ফাইলের SHA-256 ক্রিপ্টোগ্রাফিক মেটা প্রুফ হ্যাশ জেনারেট
         file_hash = hashlib.sha256(file_bytes).hexdigest()
-        
-        # ২. টাইমস্ট্যাম্প ও ফাইল সাইজ
         timestamp = datetime.datetime.now(datetime.timezone.utc).strftime("%Y-%m-%d %H:%M:%S UTC")
-        file_size = len(file_bytes)
         
         proof_data = {
             "fileName": file.filename,
-            "fileSize": f"{file_size} bytes",
+            "fileSize": f"{len(file_bytes)} bytes",
             "timestamp": timestamp,
             "metaProofHash": file_hash,
             "status": "VERIFIED_AUTHENTIC"
         }
 
-        # ৩. ফায়ারবেস ডেটাবেজে মেটা প্রুফ রেকর্ড সেভ করা
         try:
             db.reference('meta_proofs').push(proof_data)
-        except Exception as fb_err:
-            print(f"Firebase Proof Save Warning: {fb_err}")
-
-        # ৪. লাইভ ফিডে লগ আপডেট করা
-        try:
-            db.reference('live_feed').push({
-                'action': 'META_PROOF_GENERATED',
-                'details': f"Proof generated for file: {file.filename}",
-                'time': db.ServerValue.TIMESTAMP
-            })
         except Exception:
             pass
 
         return jsonify(proof_data), 200
-
     except Exception as e:
-        return jsonify({
-            "error": "মেটা প্রুফ তৈরি করতে সমস্যা হয়েছে।",
-            "details": str(e)
-        }), 500
+        return jsonify({"error": "মেটা প্রুফ তৈরি করা যায়নি।", "details": str(e)}), 500
 
+# মূল চ্যাট ব্যাকএন্ড
 @app.route('/chat', methods=['POST'])
 def chat():
     data = request.get_json(silent=True) or {}
     user_message = str(data.get('message', '')).strip().lower()
     user_role = data.get('user_role', 'MEMBER')
 
-    # লকডাউন আনলক প্রোটোকল
     if SYSTEM_STATE["is_locked_down"]:
-        if "আনলক" in user_message or "unlock" in user_message or "restore" in user_message:
+        if "আনলক" in user_message or "unlock" in user_message:
             SYSTEM_STATE["is_locked_down"] = False
-            return jsonify({
-                "reply": "🔓 সিকিউরিটি লকডাউন রিমুভ করা হয়েছে। সিস্টেম এখন স্বাভাবিকভাবে কাজ করছে।",
-                "action": "SYSTEM_RESTORED"
-            }), 200
-        return jsonify({
-            "reply": "🚨 সিস্টেম নিরাপত্তার স্বার্থে লকডাউন রয়েছে! আনলক করতে অ্যাডমিন কমান্ড দিন।",
-            "status": "SERVER_TERMINATED"
-        }), 403
+            return jsonify({"reply": "🔓 লকডাউন রিমুভ করা হয়েছে।", "action": "SYSTEM_RESTORED"}), 200
+        return jsonify({"reply": "🚨 সিস্টেম নিরাপত্তার স্বার্থে লকডাউন রয়েছে!", "status": "SERVER_TERMINATED"}), 403
 
     try:
         ai_reply = ""
         action_taken = "GENERAL_CHAT"
         alert_type = None
 
-        # ১. সাইবার সিকিউরিটি থ্রেট ডিটেকশন (লকডাউন ট্রিগার)
-        if any(hack_word in user_message for hack_word in ["hack", "exploit", "bypass_admin", "injection"]):
+        if any(h in user_message for h in ["hack", "exploit", "bypass_admin"]):
             SYSTEM_STATE["is_locked_down"] = True
-            return jsonify({
-                "reply": "🚨 হ্যাকিং চেষ্টার উপস্থিতি ধরা পড়েছে! সিস্টেম সাথে সাথে লকডাউন করা হলো!",
-                "status": "SERVER_TERMINATED",
-                "alert_type": "danger"
-            }), 200
+            return jsonify({"reply": "🚨 সাইবার থ্রেট ধরা পড়েছে! অটো কিলসুইচ ট্রিগার করা হলো!", "status": "SERVER_TERMINATED", "alert_type": "danger"}), 200
 
-        # ২. ভিআইপি প্রোটেকশন
         vip_keywords = ["রেকর্ডিং শোনাও", "ক্যামেরার ছবি", "সারাদিনের কথা", "গোপন ফাইল"]
-        if any(word in user_message for word in vip_keywords):
-            if user_role != "ADMIN":
-                return jsonify({
-                    "reply": "অ্যালাইড সিকিউরিটি অ্যাক্সেস: এই ভিআইপি তথ্য দেখার জন্য এডমিন পারমিশন প্রয়োজন।",
-                    "action": "VIP_ACCESS_DENIED",
-                    "alert_type": "warning"
-                }), 200
+        if any(w in user_message for w in vip_keywords) and user_role != "ADMIN":
+            return jsonify({"reply": "অ্যালাইড সিকিউরিটি অ্যাক্সেস: এই ভিআইপি তথ্য দেখার জন্য এডমিন পারমিশন প্রয়োজন।", "action": "VIP_ACCESS_DENIED", "alert_type": "warning"}), 200
 
-        # ৩. স্মার্ট রিলে/সুইচ কন্ট্রোল
         if "চালু" in user_message or "অন" in user_message or "on" in user_message or "বন্ধ" in user_message or "অফ" in user_message or "off" in user_message:
             target_status = "ON" if any(w in user_message for w in ["চালু", "অন", "on"]) else "OFF"
-            
-            # সব সুইচ একসাথে বন্ধ/চালু
             if "সব" in user_message or "all" in user_message:
                 for i in range(1, 9):
                     db.reference(f'devices/relay{i}').set(target_status)
@@ -193,133 +229,61 @@ def chat():
                     if key in user_message:
                         matched_relay = relay_id
                         break
-                
                 if matched_relay:
                     db.reference(f'devices/{matched_relay}').set(target_status)
-                    status_text = "চালু" if target_status == "ON" else "বন্ধ"
-                    ai_reply = f"ঠিক আছে, {matched_relay.replace('relay', '')} নাম্বার ডিভাইসটি {status_text} করা হলো।"
+                    st_txt = "চালু" if target_status == "ON" else "বন্ধ"
+                    ai_reply = f"ঠিক আছে, {matched_relay.replace('relay', '')} নাম্বার ডিভাইসটি {st_txt} করা হলো।"
                     action_taken = "DEVICE_CONTROLLED"
 
-        # ৪. নতুন নলেজ শেখা
-        if not ai_reply and any(w in user_message for w in ["মনে রাখো", "শিখে নাও", "স্মরণে রাখো"]):
+        if not ai_reply and any(w in user_message for w in ["মনে রাখো", "শিখে নাও"]):
             try:
-                parts = re.split(r'মনে রাখো|শিখে নাও|স্মরণে রাখো', user_message)
+                parts = re.split(r'মনে রাখো|শিখে নাও', user_message)
                 if len(parts) > 1 and "=" in parts[1]:
                     q, a = parts[1].split("=", 1)
-                    q, a = q.strip(), a.strip()
-                    db.reference(f'memory/{q}').set(a)
-                    ai_reply = f"ধন্যবাদ! আমি মনে রাখলাম যে: '{q}' মানে হলো '{a}'।"
+                    db.reference(f'memory/{q.strip()}').set(a.strip())
+                    ai_reply = f"ধন্যবাদ! আমি মনে রাখলাম যে: '{q.strip()}' মানে হলো '{a.strip()}'।"
                     action_taken = "KNOWLEDGE_ACQUIRED"
-                else:
-                    ai_reply = "মেমোরিতে সেভ করতে এভাবে বলুন: 'মনে রাখো আমার নাম = রানা'"
             except Exception:
-                ai_reply = "তথ্যটি মেমোরিতে সেভ করতে সমস্যা হয়েছে।"
+                ai_reply = "মেমোরিতে সেভ করতে ব্যর্থ।"
 
-        # ৫. অ্যালার্ম প্রোটোকল
-        if not ai_reply and any(word in user_message for word in ["জরুরি", "বিপদ", "এলার্ম"]):
-            ai_reply = "জরুরি সংকেত গ্রহণ করা হয়েছে। ৪ সেকেন্ডের হালকা অ্যালার্ম ট্রিগার করা হলো।"
-            action_taken = "MILD_ALARM_TRIGGERED"
-            alert_type = "warning"
-
-        # ৬. ডাটা ডিলিট প্রোটোকল
-        elif not ai_reply and ("ডিলিট" in user_message or "delete" in user_message):
-            if "সব" in user_message or "পুরোনো" in user_message:
-                try:
-                    db.reference('live_feed').delete()
-                    ai_reply = "সার্ভারের সমস্ত পুরোনো ম্যাট্রিক্স ডাটা সফলভাবে মুছে ফেলা হয়েছে।"
-                    action_taken = "DATA_DELETED"
-                except Exception:
-                    ai_reply = "ডাটা মুছে ফেলতে সমস্যা হয়েছে।"
-            else:
-                ai_reply = "নির্দিষ্ট করে বলুন কোন ডাটা ডিলিট করবেন।"
-
-        # ৭. অংক সমাধান
-        elif not ai_reply and safe_eval_math(user_message):
+        if not ai_reply and safe_eval_math(user_message):
             ai_reply = safe_eval_math(user_message)
             action_taken = "MATH_SOLVED"
 
-        # ৮. মেমোরি ও লোকাল কাস্টম নলেজ ম্যাচিং
-        elif not ai_reply:
-            try:
-                learned_memory = db.reference('memory').get() or {}
-            except Exception:
-                learned_memory = {}
-                
-            found_in_memory = False
+        if not ai_reply:
+            learned_memory = db.reference('memory').get() or {}
             for k, v in learned_memory.items():
                 if k in user_message:
                     ai_reply = str(v)
                     action_taken = "LEARNED_MEMORY_MATCH"
-                    found_in_memory = True
                     break
-            
-            if not found_in_memory:
+            if not ai_reply:
                 for k in LOCAL_KNOWLEDGE:
                     if k in user_message:
                         ai_reply = LOCAL_KNOWLEDGE[k]
                         action_taken = "LOCAL_KNOWLEDGE_MATCH"
                         break
 
-        # ৯. সাধারণ কনভার্সেশন (ডিফল্ট)
         if not ai_reply:
             ai_reply = f"আপনার নির্দেশ প্রাপ্ত হয়েছে: '{user_message}'।"
-            action_taken = "GENERAL_CHAT"
 
-        # ফায়ারবেসে লাইভ লগ আপডেট
         try:
-            db.reference('live_feed').push({
-                'action': action_taken,
-                'details': user_message,
-                'time': db.ServerValue.TIMESTAMP
-            })
+            db.reference('live_feed').push({'action': action_taken, 'details': user_message, 'time': db.ServerValue.TIMESTAMP})
         except Exception:
             pass
 
-        return jsonify({
-            "reply": ai_reply,
-            "action": action_taken,
-            "alert_type": alert_type
-        }), 200
-
+        return jsonify({"reply": ai_reply, "action": action_taken, "alert_type": alert_type}), 200
     except Exception as e:
-        print(f"Chat Processing Error: {e}")
-        return jsonify({
-            "reply": "সার্ভারে রেসপন্স প্রসেস করতে সমস্যা হয়েছে।",
-            "error": str(e)
-        }), 500
+        return jsonify({"reply": "সার্ভারে রেসপন্স প্রসেস করতে সমস্যা হয়েছে।", "error": str(e)}), 500
 
-# সেন্সর আপডেট এন্ডপয়েন্ট (ESP32 এর জন্য)
-@app.route('/update_sensors', methods=['POST'])
-def update_sensors():
-    try:
-        data = request.get_json(silent=True) or {}
-        temp = data.get('temp')
-        gas = data.get('gas')
-        
-        if temp is not None:
-            db.reference('sensors/temperature').set(temp)
-        if gas is not None:
-            db.reference('sensors/gas').set(gas)
-            
-        return jsonify({"status": "SUCCESS"}), 200
-    except Exception as e:
-        return jsonify({"status": "FAILED", "error": str(e)}), 500
-
-# লাইভ ম্যাট্রিক্স ফিড এন্ডপয়েন্ট
 @app.route('/get_live_matrix', methods=['GET'])
 def get_live_matrix():
     try:
-        ref = db.reference('live_feed')
-        feed_data = ref.order_by_child('time').limit_to_last(15).get()
+        feed_data = db.reference('live_feed').order_by_child('time').limit_to_last(15).get()
         feed_list = []
         if feed_data:
             for key, val in feed_data.items():
-                feed_list.append({
-                    "id": key,
-                    "action": val.get('action', 'UNKNOWN'),
-                    "details": val.get('details', ''),
-                    "time": str(val.get('time', ''))
-                })
+                feed_list.append({"id": key, "action": val.get('action', 'UNKNOWN'), "details": val.get('details', ''), "time": str(val.get('time', ''))})
         return jsonify({"live_feed": feed_list}), 200
     except Exception as e:
         return jsonify({"live_feed": [], "error": str(e)}), 200
