@@ -1,6 +1,5 @@
-flask
+Flask
 flask-cors
+firebase-admin
 gunicorn
 requests
-beautifulsoup4
-firebase-admin
