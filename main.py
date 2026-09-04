@@ -1,5 +1,6 @@
 import os
 import re
+import json
 import hashlib
 import datetime
 from flask import Flask, request, jsonify
@@ -10,16 +11,29 @@ from firebase_admin import credentials, db
 app = Flask(__name__)
 CORS(app)
 
-DATABASE_URL = "https://chitti-bfa21-default-rtdb.firebaseio.com/"
+# ==================== Render Environment Variables থেকে Firebase Setup ====================
+DATABASE_URL = os.environ.get('FIREBASE_DB_URL', "https://chitti-bfa21-default-rtdb.firebaseio.com/")
+cred_json_str = os.environ.get('FIREBASE_CREDENTIALS')
 
-# ফায়ারবেস ইনিশিয়ালাইজেশন
 try:
     if not firebase_admin._apps:
-        firebase_admin.initialize_app(options={
-            'databaseURL': DATABASE_URL
-        })
+        if cred_json_str:
+            # Environment Variable এর JSON স্ট্রিং থেকে Credentials পার্স করা
+            cred_dict = json.loads(cred_json_str)
+            cred = credentials.Certificate(cred_dict)
+            firebase_admin.initialize_app(cred, {
+                'databaseURL': DATABASE_URL
+            })
+            print("Firebase initialized with environment credentials successfully.")
+        else:
+            # যদি খেয়ালবশত Environment Variable না থাকে
+            firebase_admin.initialize_app(options={
+                'databaseURL': DATABASE_URL
+            })
+            print("Firebase initialized with default URL.")
 except Exception as e:
-    print(f"Firebase Init Warning: {e}")
+    print(f"Firebase Init Warning/Error: {e}")
+# =========================================================================================
 
 SYSTEM_STATE = {
     "is_locked_down": False
@@ -62,10 +76,9 @@ def home():
         "lockdown": SYSTEM_STATE["is_locked_down"]
     })
 
-# ==================== নতুন যুক্ত করা ফিচার: মেটা প্রুফ জেনারেটর ====================
+# মেটা প্রুফ জেনারেটর এন্ডপয়েন্ট
 @app.route('/generate-proof', methods=['POST'])
 def generate_proof():
-    # সিস্টেম লকডাউন থাকলে প্রসেস করবে না
     if SYSTEM_STATE["is_locked_down"]:
         return jsonify({
             "error": "🚨 সিস্টেম লকডাউনে রয়েছে। মেটা প্রুফ তৈরি করা সম্ভব নয়।",
@@ -120,11 +133,9 @@ def generate_proof():
             "error": "মেটা প্রুফ তৈরি করতে সমস্যা হয়েছে।",
             "details": str(e)
         }), 500
-# =================================================================================
 
 @app.route('/chat', methods=['POST'])
 def chat():
-    # সিকিউরিটি চেক (লকডাউন থাকলে কমান্ড প্রসেস করবে না)
     data = request.get_json(silent=True) or {}
     user_message = str(data.get('message', '')).strip().lower()
     user_role = data.get('user_role', 'MEMBER')
@@ -166,7 +177,7 @@ def chat():
                     "alert_type": "warning"
                 }), 200
 
-        # ৩. স্মার্ট রিলে/সুইচ কন্ট্রোল (ভয়েস বা টেক্সট)
+        # ৩. স্মার্ট রিলে/সুইচ কন্ট্রোল
         if "চালু" in user_message or "অন" in user_message or "on" in user_message or "বন্ধ" in user_message or "অফ" in user_message or "off" in user_message:
             target_status = "ON" if any(w in user_message for w in ["চালু", "অন", "on"]) else "OFF"
             
@@ -189,7 +200,7 @@ def chat():
                     ai_reply = f"ঠিক আছে, {matched_relay.replace('relay', '')} নাম্বার ডিভাইসটি {status_text} করা হলো।"
                     action_taken = "DEVICE_CONTROLLED"
 
-        # ৪. নতুন নলেজ শেখা (Dynamic Memory Acquisition)
+        # ৪. নতুন নলেজ শেখা
         if not ai_reply and any(w in user_message for w in ["মনে রাখো", "শিখে নাও", "স্মরণে রাখো"]):
             try:
                 parts = re.split(r'মনে রাখো|শিখে নাও|স্মরণে রাখো', user_message)
@@ -229,8 +240,11 @@ def chat():
 
         # ৮. মেমোরি ও লোকাল কাস্টম নলেজ ম্যাচিং
         elif not ai_reply:
-            # আগে ফায়ারবেস মেমোরি চেক করবে
-            learned_memory = db.reference('memory').get() or {}
+            try:
+                learned_memory = db.reference('memory').get() or {}
+            except Exception:
+                learned_memory = {}
+                
             found_in_memory = False
             for k, v in learned_memory.items():
                 if k in user_message:
@@ -239,7 +253,6 @@ def chat():
                     found_in_memory = True
                     break
             
-            # মেমোরিতে না পেলে লোকাল ফিক্সড উত্তর চেক করবে
             if not found_in_memory:
                 for k in LOCAL_KNOWLEDGE:
                     if k in user_message:
@@ -252,7 +265,7 @@ def chat():
             ai_reply = f"আপনার নির্দেশ প্রাপ্ত হয়েছে: '{user_message}'।"
             action_taken = "GENERAL_CHAT"
 
-        # ফায়ারবেসে লাইভ লগ পেস্ট করা
+        # ফায়ারবেসে লাইভ লগ আপডেট
         try:
             db.reference('live_feed').push({
                 'action': action_taken,
@@ -269,6 +282,7 @@ def chat():
         }), 200
 
     except Exception as e:
+        print(f"Chat Processing Error: {e}")
         return jsonify({
             "reply": "সার্ভারে রেসপন্স প্রসেস করতে সমস্যা হয়েছে।",
             "error": str(e)
@@ -291,7 +305,7 @@ def update_sensors():
     except Exception as e:
         return jsonify({"status": "FAILED", "error": str(e)}), 500
 
-# লাইভ ম্যাট্রিক্স ফিড এন্ডপয়েন্ট (HTML ফ্রন্টএন্ডের জন্য)
+# লাইভ ম্যাট্রিক্স ফিড এন্ডপয়েন্ট
 @app.route('/get_live_matrix', methods=['GET'])
 def get_live_matrix():
     try:
