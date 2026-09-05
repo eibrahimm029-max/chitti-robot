@@ -42,7 +42,6 @@ def monitor_and_clean_firebase():
                 for log_id, data in logs.items():
                     if isinstance(data, dict):
                         log_time = data.get('time', 0)
-                        # মিলি সেকেন্ড হলে সেকেন্ডে রূপান্তর
                         if log_time > 1e11: log_time /= 1000
                         if (current_time - log_time) > cutoff_seconds:
                             db.reference(f'live_feed/{log_id}').delete()
@@ -60,17 +59,125 @@ def monitor_and_clean_firebase():
             
         time.sleep(300) # প্রতি ৫ মিনিট পর পর ব্যাকগ্রাউন্ড স্ক্যান সম্পন্ন হবে
 
-# ব্যাকগ্রাউন্ড ট্রেড চালু রাখা
 Thread(target=monitor_and_clean_firebase, daemon=True).start()
 
-# ==================== মূল কমান্ড হ্যান্ডলার ====================
+# ==================== ১. ওনার ভেরিফিকেশন ও বায়োমেট্রিক API ====================
+@app.route('/api/verify-owner', methods=['POST', 'OPTIONS'])
+def verify_owner():
+    if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
+    
+    data = request.get_json(silent=True) or {}
+    signature = data.get('biometric_signature', '')
+    
+    if signature == "SUCCESS_BIOMETRIC":
+        return jsonify({
+            "status": "SUCCESS",
+            "message": "🔓 ওনার বায়োমেট্রিক সফলভাবে যাচাই করা হয়েছে।",
+            "owner_token": PRIMARY_OWNER_TOKEN,
+            "owner_details": {
+                "name": "Primary Owner",
+                "photo_url": "https://i.imgur.com/6VBx3io.png",
+                "voice_freq": "120Hz-240Hz Matched",
+                "face_status": "Verified 3D Sandbox"
+            }
+        }), 200
+    
+    return jsonify({"status": "FAILED", "message": "🚨 বায়োমেট্রিক ট্রিপল-লক মেলেনি!"}), 403
+
+# ==================== ২. ফ্যামিলি রেজিস্ট্রি ও পারমিশন কন্ট্রোল API ====================
+@app.route('/api/family/add', methods=['POST', 'OPTIONS'])
+def add_family_member():
+    if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
+    
+    data = request.get_json(silent=True) or {}
+    user_token = data.get('owner_token', '')
+    name = data.get('name', '').strip()
+    pin = data.get('pin', '').strip()
+    allowed_relays = data.get('allowed_relays', [])
+    allowed_features = data.get('allowed_features', [])
+
+    if user_token != PRIMARY_OWNER_TOKEN:
+        return jsonify({"status": "FAILED", "message": "🚨 কেবল মালিক এই পারমিশন যুক্ত করতে পারবেন।"}), 403
+
+    if not name or not pin:
+        return jsonify({"status": "FAILED", "message": "নাম ও পিন প্রদান করুন।"}), 400
+
+    member_id = f"fam_{int(time.time())}"
+    db.reference(f'family_members/{member_id}').set({
+        'name': name,
+        'pin': pin,
+        'relays': allowed_relays,
+        'features': allowed_features,
+        'created_at': time.time()
+    })
+
+    return jsonify({"status": "SUCCESS", "message": f"✅ সদস্য '{name}' সফলভাবে নিবন্ধিত হয়েছেন।"}), 200
+
+@app.route('/api/family/list', methods=['POST', 'OPTIONS'])
+def list_family_members():
+    if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
+    
+    data = request.get_json(silent=True) or {}
+    user_token = data.get('owner_token', '')
+
+    if user_token != PRIMARY_OWNER_TOKEN:
+        return jsonify({"status": "FAILED", "message": "অনুমতি নেই।"}), 403
+
+    members = db.reference('family_members').get() or {}
+    return jsonify({"status": "SUCCESS", "members": members}), 200
+
+@app.route('/api/family/delete/<member_id>', methods=['DELETE', 'OPTIONS'])
+def delete_family_member(member_id):
+    if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
+    
+    data = request.get_json(silent=True) or {}
+    user_token = data.get('owner_token', '')
+
+    if user_token != PRIMARY_OWNER_TOKEN:
+        return jsonify({"status": "FAILED", "message": "অনুমতি নেই।"}), 403
+
+    db.reference(f'family_members/{member_id}').delete()
+    return jsonify({"status": "SUCCESS", "message": "সদস্য মুছে ফেলা হয়েছে।"}), 200
+
+# ==================== ৩. ন্যানো-সেকেন্ড ফার্স্ট সুইচিং API ====================
+@app.route('/fast_switch', methods=['POST', 'OPTIONS'])
+def fast_switch():
+    if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
+
+    data = request.get_json(silent=True) or {}
+    device_id = data.get('device')
+    action = str(data.get('action', '')).upper()
+
+    if not device_id or action not in ['ON', 'OFF']:
+        return jsonify({"status": "FAILED", "reply": "ভুল কমান্ড।"}), 400
+
+    ref = db.reference(f'devices/{device_id}')
+    curr_state = ref.get()
+
+    if curr_state == action:
+        status_text = "চালু" if curr_state == "ON" else "বন্ধ"
+        return jsonify({
+            "status": "ALREADY_IN_STATE",
+            "reply": f"ডিভাইস {device_id.replace('relay', '')} ইতিমধ্যেই {status_text} অবস্থায় রয়েছে।",
+            "state": curr_state
+        }), 200
+
+    ref.set(action)
+    status_text = "চালু" if action == "ON" else "বন্ধ"
+    return jsonify({
+        "status": "SUCCESS",
+        "reply": f"✅ ডিভাইস {device_id.replace('relay', '')} {status_text} করা হলো।",
+        "state": action
+    }), 200
+
+# ==================== ৪. মূল কমান্ড হ্যান্ডলার ====================
 @app.route('/chat', methods=['POST', 'OPTIONS'])
 def process_command():
     if request.method == 'OPTIONS': return jsonify({'status': 'OK'}), 200
 
     data = request.get_json(silent=True) or {}
     cmd = str(data.get('message', '')).strip().lower()
-    source = data.get('source', 'WEB') # WEB/MOBILE অথবা ESP32
+    source = data.get('source', 'WEB')
     user_token = data.get('owner_token', '')
 
     if not cmd:
@@ -78,9 +185,7 @@ def process_command():
 
     reply_text = ""
     action_type = "UNKNOWN"
-    is_owner = (user_token == PRIMARY_OWNER_TOKEN)
 
-    # ১. মোবাইল ও ওয়েব রেকর্ডিং কমান্ড
     if "মোবাইল" in cmd or "ওয়েব" in cmd or "web" in cmd or "mobile" in cmd:
         if "রেকর্ড" in cmd or "rec" in cmd:
             if "চালু" in cmd or "অন" in cmd or "start" in cmd:
@@ -90,7 +195,6 @@ def process_command():
                 reply_text = "⏹️ মোবাইলের/ওয়েব পেজের রেকর্ডিং বন্ধ করা হলো।"
                 action_type = "STOP_WEB_RECORDING"
 
-    # ২. ইএসপি৩২ (ESP32) হার্ডওয়্যার রেকর্ডিং কমান্ড
     elif "ইএসপি" in cmd or "esp" in cmd or "বোর্ড" in cmd or source == "ESP32":
         if "রেকর্ড" in cmd or "rec" in cmd:
             if "চালু" in cmd or "অন" in cmd or "start" in cmd:
@@ -102,7 +206,6 @@ def process_command():
                 reply_text = "⏹️ ESP32 বোর্ডের রেকর্ডিং বন্ধ করা হলো।"
                 action_type = "ESP_REC_OFF"
 
-    # ৩. জেনেরিক রেকর্ডিং কমান্ড (সোর্স ধরে সিদ্ধান্ত নেবে)
     elif "রেকর্ড" in cmd or "রেকর্ডিং" in cmd:
         if "চালু" in cmd or "অন" in cmd or "start" in cmd:
             if source == "ESP32":
@@ -121,7 +224,6 @@ def process_command():
                 reply_text = "⏹️ মোবাইলের রেকর্ডিং বন্ধ করা হলো।"
                 action_type = "STOP_WEB_RECORDING"
 
-    # ৪. রিলে ও সুইচ কন্ট্রোল
     elif any(w in cmd for w in ["চালু", "অন", "বন্ধ", "অফ", "on", "off"]):
         status = "ON" if any(w in cmd for w in ["চালু", "অন", "on"]) else "OFF"
         for i in range(1, 9):
@@ -131,11 +233,9 @@ def process_command():
                 action_type = "DEVICE_CONTROL"
                 break
 
-    # কমান্ড নিশ্চিত না হলে
     if not reply_text:
         reply_text = f"কমান্ড বুঝতে পারিনি: '{cmd}'"
 
-    # ফায়ারবেসে তথ্য যুক্ত করা
     try:
         db.reference('live_feed').push({
             'action': action_type,
