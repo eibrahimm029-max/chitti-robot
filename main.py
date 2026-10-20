@@ -1,17 +1,13 @@
 import os
-import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, db
 
 app = Flask(__name__)
-# সব ডোমেইন থেকে রিকোয়েস্ট এক্সেপ্ট করার জন্য CORS কনফিগারেশন
 CORS(app, resources={r"/*": {"origins": "*"}})
 
-YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
-
-# ফায়ারবেস সার্ভিস ইনিশিয়ালাইজেশন
+# ফায়ারবেস কানেকশন ইনিশিয়ালাইজেশন
 try:
     firebase_cred_json = os.environ.get("FIREBASE_CRED")
     firebase_db_url = os.environ.get("FIREBASE_DB_URL", "https://chitti-bfo2i-default-rtdb.firebaseio.com/")
@@ -24,7 +20,16 @@ try:
 except Exception as e:
     print(f"Firebase Init Error: {e}")
 
-# 🤖 এআই অটোনোমাস প্রজেক্ট ও পিসিবি জেনারেটর এপিআই
+# ১. হোম পেজ রুট (যাতে ব্রাউজারে 'Not Found' না এসে সার্ভার স্ট্যাটাস দেখায়)
+@app.route('/', methods=['GET'])
+def home():
+    return jsonify({
+        "system": "Chitti AI Autonomous Ecosystem",
+        "status": "Online & Active 24/7",
+        "message": "Backend server is running successfully. Connect via GitHub Dashboard or ESP32."
+    })
+
+# ২. এআই অটোনোমাস প্রজেক্ট ও পিসিবি জেনারেটর এপিআই
 @app.route('/api/ai/autonomous-engine', methods=['POST', 'OPTIONS'])
 def autonomous_engine():
     if request.method == 'OPTIONS':
@@ -62,7 +67,7 @@ def autonomous_engine():
         "package": ai_generated_package
     })
 
-# স্বাস্থ্য পরীক্ষা ও স্ট্যাটাস এন্ডপয়েন্ট
+# ৩. সিস্টেম স্ট্যাটাস এন্ডপয়েন্ট
 @app.route('/api/webhook/status', methods=['GET', 'OPTIONS'])
 def get_system_status():
     if request.method == 'OPTIONS':
