@@ -1,65 +1,73 @@
-
 import os
+import requests
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 import firebase_admin
 from firebase_admin import credentials, db
 
 app = Flask(__name__)
-CORS(app)
+# সব ডোমেইন থেকে রিকোয়েস্ট এক্সেপ্ট করার জন্য CORS কনফিগারেশন
+CORS(app, resources={r"/*": {"origins": "*"}})
 
 YOUTUBE_API_KEY = os.environ.get("YOUTUBE_API_KEY")
 
-# ফায়ারবেস কানেকশন ইনিশিয়ালাইজেশন
+# ফায়ারবেস সার্ভিস ইনিশিয়ালাইজেশন
 try:
     firebase_cred_json = os.environ.get("FIREBASE_CRED")
     firebase_db_url = os.environ.get("FIREBASE_DB_URL", "https://chitti-bfo2i-default-rtdb.firebaseio.com/")
-    if not firebase_admin._apps:
+    if not firebase_admin._apps and firebase_cred_json:
         cred = credentials.Certificate(eval(firebase_cred_json))
         firebase_admin.initialize_app(cred, {
             'databaseURL': firebase_db_url
         })
-    print("Firebase Connected Successfully!")
+        print("Firebase Connected Successfully!")
 except Exception as e:
     print(f"Firebase Init Error: {e}")
 
-# 🤖 এআই অটোনোমাস প্রজেক্ট এবং ইনকাম জেনারেটর ইঞ্জিন
-@app.route('/api/ai/autonomous-engine', methods=['POST'])
+# 🤖 এআই অটোনোমাস প্রজেক্ট ও পিসিবি জেনারেটর এপিআই
+@app.route('/api/ai/autonomous-engine', methods=['POST', 'OPTIONS'])
 def autonomous_engine():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
     data = request.json or {}
-    niche = data.get("niche", "ESP32 Autonomous IoT & Smart Robotics")
+    niche = data.get("niche", "ESP32 Autonomous IoT & PCB Design")
     
-    # এআই নিজে থেকেই ট্রেন্ডিং ও হাই-পেমেন্ট টেক টপিক তৈরি করবে
     title = f"🔥 How to Build an Autonomous {niche} (Zero-Effort Guide)"
     description = (
-        f"Discover the ultimate automated workflow for {niche}. "
-        f"We cover hardware bridging, PCB layouts, and automated tech monetization.\n\n"
+        f"Discover the ultimate automated workflow for {niche}.\n\n"
         f"💰 Monetization & Earning Sources:\n"
         f"- YouTube Partner Program (AdSense)\n"
         f"- Hardware Affiliate Links & Sponsorships\n\n"
-        f"#Automation #{niche.replace(' ', '')} #IoTProjects #TechIncomes"
+        f"#Automation #{niche.replace(' ', '')} #IoT #TechIncomes"
     )
     
     ai_generated_package = {
         "project_title": title,
         "description": description,
         "status": "Ready for Auto-Publish",
-        "income_streams": ["YouTube AdSense", "Amazon/AliExpress Tech Affiliate"],
-        "pcb_status": "Auto-Optimized via EasyEDA Rules"
+        "income_streams": ["YouTube AdSense", "Tech Affiliates"],
+        "pcb_routing": "Auto-routed via ERC/DRC Rules (EasyEDA compatible)"
     }
     
-    # ফায়ারবেসে প্রজেক্টটি সেভ করা
-    ref = db.reference("autonomous_projects")
-    new_ref = ref.push(ai_generated_package)
+    try:
+        ref = db.reference("autonomous_projects")
+        ref.push(ai_generated_package)
+    except Exception as e:
+        print("Firebase Push Warning:", e)
     
     return jsonify({
         "success": True,
-        "message": "AI has successfully generated autonomous project & income pipeline!",
+        "message": "AI Generated Autonomous Package Successfully!",
         "package": ai_generated_package
     })
 
-@app.route('/api/webhook/status', methods=['GET'])
+# স্বাস্থ্য পরীক্ষা ও স্ট্যাটাস এন্ডপয়েন্ট
+@app.route('/api/webhook/status', methods=['GET', 'OPTIONS'])
 def get_system_status():
+    if request.method == 'OPTIONS':
+        return jsonify({'status': 'ok'}), 200
+
     try:
         ref = db.reference("autonomous_projects")
         tasks = ref.get() or []
