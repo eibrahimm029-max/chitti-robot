@@ -15,8 +15,8 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 if GEMINI_API_KEY:
     try:
         genai.configure(api_key=GEMINI_API_KEY)
-        # সবচেয়ে লেটেস্ট এবং রিয়েল-টাইম জেমিনি মডেল
-        ai_model = genai.GenerativeModel('gemini-1.5-flash')
+        # জেমিনির বর্তমান সঠিক এবং কাজ করার মতো মডেলের নাম
+        ai_model = genai.GenerativeModel('gemini-pro')
     except Exception as e:
         print(f"Gemini Config Error: {e}")
         ai_model = None
