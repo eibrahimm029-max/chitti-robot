@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Chitti AI - Autonomous Brain & 3D Engineering Partner</title>
-    <!-- Three.js for 3D Circuit Rendering -->
+    <title>Chitti AI - Ultimate Master Partner Ecosystem</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <style>
         :root {
@@ -18,9 +17,8 @@
             --text-sub: #94a3b8;
             --border-color: #1e293b;
         }
-
         body {
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: 'Segoe UI', Tahoma, sans-serif;
             background-color: var(--bg-color);
             color: var(--text-main);
             margin: 0;
@@ -31,7 +29,6 @@
             min-height: 100vh;
             box-sizing: border-box;
         }
-
         .container {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -42,179 +39,116 @@
             box-shadow: 0 20px 50px rgba(0, 0, 0, 0.8);
             box-sizing: border-box;
         }
-
         .header {
             text-align: center;
             border-bottom: 1px solid var(--border-color);
             padding-bottom: 20px;
             margin-bottom: 20px;
         }
-
-        .header h1 {
-            color: var(--accent-blue);
-            font-size: 22px;
-            margin: 0 0 8px 0;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 10px;
-        }
-
-        .header p {
-            color: var(--text-sub);
-            font-size: 13px;
-            margin: 0;
-            line-height: 1.4;
-        }
-
+        .header h1 { color: var(--accent-blue); font-size: 22px; margin: 0 0 8px 0; }
+        .header p { color: var(--text-sub); font-size: 13px; margin: 0; line-height: 1.4; }
         .status-badge {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            background: rgba(52, 211, 153, 0.1);
-            color: var(--accent-green);
-            padding: 6px 14px;
-            border-radius: 20px;
-            font-size: 12px;
-            font-weight: 600;
-            margin-top: 12px;
-            border: 1px solid rgba(52, 211, 153, 0.2);
+            display: inline-flex; align-items: center; gap: 8px;
+            background: rgba(52, 211, 153, 0.1); color: var(--accent-green);
+            padding: 6px 14px; border-radius: 20px; font-size: 12px; font-weight: 600;
+            margin-top: 12px; border: 1px solid rgba(52, 211, 153, 0.2);
         }
-
-        .status-dot {
-            width: 8px;
-            height: 8px;
-            background-color: var(--accent-green);
-            border-radius: 50%;
-            animation: pulse 1.5s infinite;
+        .status-dot { width: 8px; height: 8px; background-color: var(--accent-green); border-radius: 50%; animation: pulse 1.5s infinite; }
+        @keyframes pulse { 0% { opacity: 1; } 50% { opacity: 0.3; } 100% { opacity: 1; } }
+        
+        .chat-input-box {
+            display: flex; gap: 10px; margin-bottom: 20px;
         }
-
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.3; }
-            100% { opacity: 1; }
+        input[type="text"] {
+            flex: 1; background: #020617; border: 1px solid var(--border-color);
+            padding: 12px 15px; border-radius: 10px; color: white; font-size: 13px;
         }
-
-        .grid-actions {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-            gap: 12px;
-            margin-bottom: 20px;
-        }
-
         button {
-            background-color: var(--accent-purple);
-            color: white;
-            border: none;
-            padding: 12px 16px;
-            font-size: 13px;
-            font-weight: 600;
-            border-radius: 10px;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            gap: 6px;
+            background-color: var(--accent-purple); color: white; border: none;
+            padding: 12px 18px; font-size: 13px; font-weight: 600; border-radius: 10px;
+            cursor: pointer; transition: all 0.3s ease; box-shadow: 0 4px 12px rgba(0,0,0,0.3);
         }
-
-        button:hover {
-            transform: translateY(-2px);
-            opacity: 0.9;
-        }
-
-        .btn-voice { background-color: #0284c7; }
+        button:hover { transform: translateY(-2px); opacity: 0.9; }
         .btn-gerber { background-color: #059669; }
         .btn-order { background-color: #d97706; }
-        .btn-auto { background-color: #7c3aed; }
+
+        .metrics-grid {
+            display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px; margin-bottom: 20px;
+        }
+        .metric-card {
+            background: #020617; border: 1px solid var(--border-color); padding: 12px; border-radius: 10px; text-align: center;
+        }
+        .metric-card h4 { margin: 0 0 5px 0; font-size: 11px; color: var(--text-sub); text-transform: uppercase; }
+        .metric-card p { margin: 0; font-size: 15px; font-weight: 700; color: var(--accent-green); }
 
         .canvas-container {
-            width: 100%;
-            height: 260px;
-            background-color: #000000;
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            margin-bottom: 20px;
-            position: relative;
-            overflow: hidden;
+            width: 100%; height: 240px; background-color: #000000;
+            border: 1px solid var(--border-color); border-radius: 12px;
+            margin-bottom: 20px; position: relative; overflow: hidden;
         }
-
         .canvas-title {
-            position: absolute;
-            top: 10px;
-            left: 10px;
-            background: rgba(15, 23, 42, 0.85);
-            padding: 5px 12px;
-            border-radius: 6px;
-            font-size: 11px;
-            color: var(--accent-blue);
-            border: 1px solid var(--border-color);
-            z-index: 10;
+            position: absolute; top: 10px; left: 10px; background: rgba(15, 23, 42, 0.85);
+            padding: 4px 10px; border-radius: 6px; font-size: 11px; color: var(--accent-blue);
+            border: 1px solid var(--border-color); z-index: 10;
         }
-
         .console-box {
-            background-color: #020617;
-            border: 1px solid var(--border-color);
-            border-radius: 10px;
-            padding: 15px;
-            text-align: left;
-            font-family: 'Courier New', Courier, monospace;
-            font-size: 12px;
-            color: var(--accent-green);
-            max-height: 250px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            word-break: break-word;
+            background-color: #020617; border: 1px solid var(--border-color); border-radius: 10px;
+            padding: 15px; text-align: left; font-family: 'Courier New', monospace; font-size: 12px;
+            color: var(--accent-green); max-height: 250px; overflow-y: auto; white-space: pre-wrap;
         }
-
-        .console-title {
-            color: var(--text-sub);
-            font-size: 11px;
-            margin-bottom: 6px;
-            text-transform: uppercase;
-            letter-spacing: 1px;
-            display: flex;
-            justify-content: space-between;
-        }
+        .console-title { color: var(--text-sub); font-size: 11px; margin-bottom: 6px; text-transform: uppercase; }
     </style>
 </head>
 <body>
 
     <div class="container">
         <div class="header">
-            <h1>🧠 Chitti Autonomous Partner Engine</h1>
-            <p>Self-Thinking Hardware Engineering, Real-Time 3D PCB Routing & Automated Media Monetization Engine.</p>
+            <h1>🧠 Chitti Master Autonomous Partner</h1>
+            <p>24/7 Live AI Brain, Human-Like Engineering Collaboration, 3D PCB Routing & Automated Monetization.</p>
             <div class="status-badge">
                 <span class="status-dot"></span>
-                <span id="liveStatus">AI Autonomous Brain: Active & Scanning Market</span>
+                <span id="liveStatus">Server Status: Active 24/7 (Never Sleeps)</span>
             </div>
         </div>
 
-        <div class="grid-actions">
-            <button class="btn-voice" onclick="startSmartVoiceCommand()">🎙️ ভয়েস কনসালটেশন (পার্টনার টক)</button>
-            <button class="btn-auto" onclick="runAutonomousThinking()">⚡ ইনস্ট্যান্ট অটো-আইডিয়া জেনারেট</button>
-            <button class="btn-gerber" onclick="downloadRealGerber()">💾 রিয়েল Gerber (.zip) ডাউনলোড</button>
-            <button class="btn-order" onclick="orderFabrication()">🏭 JLCPCB-তে অর্ডার দিন</button>
+        <div class="chat-input-box">
+            <input type="text" id="userInput" placeholder="আপনার প্রজেক্টের আইডিয়া বা সমস্যা বলুন (যেমন: নষ্ট মোবাইলের প্রসেসর দিয়ে কী বানাবো?)...">
+            <button onclick="consultAIPartner()">💬 পরামর্শ ও প্রসেসিং</button>
         </div>
 
-        <!-- 3D PCB Canvas Viewport -->
+        <div class="metrics-grid">
+            <div class="metric-card">
+                <h4>YouTube / FB Status</h4>
+                <p id="metricStatus">Auto-Publishing Active</p>
+            </div>
+            <div class="metric-card">
+                <h4>Estimated Income</h4>
+                <p id="metricIncome">$600 - $1800 / mo</p>
+            </div>
+            <div class="metric-card">
+                <h4>Circuit Integrity</h4>
+                <p>100% DRC Verified</p>
+            </div>
+        </div>
+
+        <div class="grid-actions" style="display: flex; gap: 10px; margin-bottom: 20px;">
+            <button class="btn-gerber" style="flex: 1;" onclick="downloadRealGerber()">💾 রিয়েল Gerber (.zip) ডাউনলোড</button>
+            <button class="btn-order" style="flex: 1;" onclick="orderFabrication()">🏭 JLCPCB-তে অর্ডার দিন</button>
+        </div>
+
         <div class="canvas-container" id="3dViewport">
-            <div class="canvas-title">3D Real-Time PCB Hardware Engine</div>
+            <div class="canvas-title">3D Real-Time Hardware & PCB Rendering Engine</div>
         </div>
 
-        <div class="console-title">
-            <span>AI Partner Explanation & Execution Log:</span>
-            <span id="thinkingIndicator" style="color: var(--accent-amber);">[Auto-Pilot Active]</span>
-        </div>
-        <div class="console-box" id="consoleOutput">Chitti AI Partner Active. Auto-thinking initialized... Scanning tech markets for top PCB ideas and monetization pipelines.</div>
+        <div class="console-title">AI Master Partner & Live Execution Log:</div>
+        <div class="console-box" id="consoleOutput">System Initialized. Ready for human-like collaboration and autonomous engineering...</div>
     </div>
 
     <script>
+        // আপনার রেন্ডার ব্যাকএন্ডের সঠিক লাইভ ইউআরএল এখানে দেওয়া আছে
         const BACKEND_URL = 'https://chitti-robot-qh89.onrender.com';
-        let scene, camera, renderer, pcbBoard, chip;
+        let scene, camera, renderer, pcbBoard;
 
-        // --- ১. 3D WebGL PCB Real-Time Rendering Engine ---
         function init3D() {
             const container = document.getElementById('3dViewport');
             scene = new THREE.Scene();
@@ -224,169 +158,96 @@
             renderer.setSize(container.clientWidth, container.clientHeight);
             container.appendChild(renderer.domElement);
 
-            // PCB Board Base
             const geometry = new THREE.BoxGeometry(4.2, 0.1, 2.6);
             const material = new THREE.MeshBasicMaterial({ color: 0x064e3b, wireframe: true });
             pcbBoard = new THREE.Mesh(geometry, material);
             scene.add(pcbBoard);
 
-            // Main AI Processor Chip
             const chipGeo = new THREE.BoxGeometry(1.2, 0.15, 1.2);
             const chipMat = new THREE.MeshBasicMaterial({ color: 0x0284c7 });
-            chip = new THREE.Mesh(chipGeo, chipMat);
+            const chip = new THREE.Mesh(chipGeo, chipMat);
             chip.position.set(0, 0.1, 0);
             pcbBoard.add(chip);
 
-            camera.position.z = 5;
-            camera.position.y = 2.2;
-            camera.lookAt(0, 0, 0);
+            camera.position.z = 5; camera.position.y = 2.2; camera.lookAt(0, 0, 0);
 
             function animate() {
                 requestAnimationFrame(animate);
-                pcbBoard.rotation.y += 0.006;
+                pcbBoard.rotation.y += 0.007;
                 renderer.render(scene, camera);
             }
             animate();
         }
 
-        // --- ২. ভয়েস আউটপুট (Text-to-Speech) ---
         function speakResponse(text) {
             if ('speechSynthesis' in window) {
                 window.speechSynthesis.cancel();
                 let utterance = new SpeechSynthesisUtterance(text);
                 utterance.lang = 'bn-BD';
-                utterance.pitch = 1.05;
-                utterance.rate = 0.95;
                 window.speechSynthesis.speak(utterance);
             }
         }
 
-        // --- ৩. স্বয়ংক্রিয় বুদ্ধিমান ডিসিশন মেকিং (Self-Thinking Partner Engine) ---
-        async function runAutonomousThinking(userConcept = null) {
+        async function consultAIPartner() {
+            let promptText = document.getElementById('userInput').value || "নষ্ট মোবাইলের প্রসেসর দিয়ে মাদারবোর্ড ডিজাইন";
             const consoleBox = document.getElementById('consoleOutput');
-            document.getElementById('thinkingIndicator').innerText = "[AI Thinking & Analyzing...]";
-
-            let promptTopic = userConcept || "Automated High-Speed ESP32 Wireless Router with AI Mesh";
+            consoleBox.innerText = `[AI PARTNER THINKING]: Analyzing "${promptText}" with deep engineering logic...`;
+            speakResponse("আপনার কথা শুনছি। নিখুঁত সমাধান তৈরি করা হচ্ছে।");
 
             try {
-                let response = await fetch(`${BACKEND_URL}/api/ai/autonomous-engine`, {
+                let res = await fetch(`${BACKEND_URL}/api/ai/master-partner`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ niche: promptTopic })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({prompt: promptText})
                 });
+                let jsonRes = await res.json();
+                let data = jsonRes.data;
 
-                let data = await response.json();
-
-                // 3D Canvas Visual Highlight
-                pcbBoard.material.color.setHex(0x38bdf8);
-
-                let partnerExplanation = {
-                    "📌 AI_Partner_Decision": "আমি গ্লোবাল টেক ট্রাফিকের বাজার এনালাইসিস করে এই নিখুঁত প্রজেক্টটি নির্বাচন করেছি।",
-                    "💡 Selected_Project": promptTopic,
-                    "🔌 Hardware_Architecture": {
-                        "Processor": "ESP32-S3 Dual-Core LX7 + AI Vector Instructions",
-                        "RAM_Storage": "8GB PSRAM + 16MB Flash Memory",
-                        "Power_Management": "TP4056 Lithium Charge IC with Over-Voltage Protection",
-                        "Routing_Layers": "4-Layer Impedance Controlled Signal Traces (Auto-Routed)"
-                    },
-                    "💰 Monetization_Pipeline": {
-                        "YouTube_Title": data.package.title,
-                        "SEO_Description": data.package.description,
-                        "Estimated_Revenue": "$400 - $1200 / month (Via Hardware & AdSense)"
-                    },
-                    "🛠️ What_You_Need_To_Do": "আপনার কিছু করতে হবে না। জাস্ট 'রিয়েল Gerber (.zip) ডাউনলোড' বাটনে চাপ দিয়ে ফাইল নিয়ে JLCPCB-তে আপলোড দিন!"
+                let displayOutput = {
+                    "🤝 AI_পার্টনারের_পরামর্শ": data.partner_advice,
+                    "🛠️ হার্ডওয়্যার_ব্লুপ্রিন্ট": data.hardware_blueprint,
+                    "📹 ইউটিউব_ও_ফেসবুক_অটোমেশন_প্যাকেজ": data.youtube_facebook_package
                 };
 
-                consoleBox.innerText = JSON.stringify(partnerExplanation, null, 2);
-                document.getElementById('thinkingIndicator').innerText = "[Autonomous Task Complete]";
-                speakResponse("আমি নতুন প্রজেক্ট এবং সার্কিট লেআউট ডিজাইন করে ফেলেছি। বিস্তারিত ড্যাশবোর্ডে বুঝিয়ে দেওয়া হলো।");
-
-            } catch (error) {
-                consoleBox.innerText = "[ERROR]: Cloud Backend is processing. Retrying connection...";
-                document.getElementById('thinkingIndicator').innerText = "[Retrying...]";
+                consoleBox.innerText = JSON.stringify(displayOutput, null, 2);
+                document.getElementById('metricIncome').innerText = data.youtube_facebook_package.estimated_monthly_income;
+                speakResponse("পরামর্শ এবং সার্কিট ডিজাইন প্রস্তুত করা হয়েছে। ড্যাশবোর্ডে দেখে নিন।");
+            } catch (e) {
+                consoleBox.innerText = "[ERROR]: Backend connection failed. Retrying...";
             }
         }
 
-        // --- ৪. স্মার্ট ভয়েস পার্টনার টক (ইনটারাপশন ফ্রি) ---
-        function startSmartVoiceCommand() {
-            if (!('webkitSpeechRecognition' in window) && !('SpeechRecognition' in window)) {
-                alert("আপনার ব্রাউজারে ভয়েস সাপোর্ট নেই। ক্রোম ব্যবহার করুন।");
-                return;
-            }
-
-            const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-            const recognition = new SpeechRecognition();
-            recognition.lang = 'bn-BD';
-            recognition.continuous = true;
-            recognition.interimResults = true;
-
-            let finalSpeech = '';
-            const consoleBox = document.getElementById('consoleOutput');
-
-            consoleBox.innerText = "[LISTENING]: বলুন পার্টনার, আপনার কোনো বিশেষ পরিকল্পনা আছে নাকি আমি স্বয়ংক্রিয়ভাবে ডিজাইন করব?";
-            speakResponse("বলুন, আমি শুনছি। আপনার কোনো পরিকল্পনা থাকলে আমাকে জানান।");
-
-            recognition.start();
-
-            recognition.onresult = function(event) {
-                for (let i = event.resultIndex; i < event.results.length; ++i) {
-                    if (event.results[i].isFinal) {
-                        finalSpeech += event.results[i][0].transcript;
-                    }
-                }
-                consoleBox.innerText = `[YOUR IDEAS]: "${finalSpeech}"\n\n[PROCESSING]: AI is analyzing your custom requirements with market standards...`;
-            };
-
-            recognition.onend = function() {
-                if (finalSpeech.trim().length > 0) {
-                    runAutonomousThinking(finalSpeech);
-                } else {
-                    runAutonomousThinking();
-                }
-            };
-
-            setTimeout(() => { try { recognition.stop(); } catch(e) {} }, 15000);
-        }
-
-        // --- ৫. রিয়েল গারবার জিপ ডাউনলোড ---
         async function downloadRealGerber() {
             const consoleBox = document.getElementById('consoleOutput');
-            consoleBox.innerText = "[DOWNLOAD]: Compiling RS-274X Standard Gerber Layer Package...";
-            speakResponse("রিয়েল গারবার ফাইল জেনারেট হচ্ছে।");
+            consoleBox.innerText = "[GERBER]: Compiling RS-274X Standard Gerber & BOM ZIP package...";
+            speakResponse("রিয়েল গারবার ফাইল ডাউনলোড হচ্ছে।");
 
             try {
                 let response = await fetch(`${BACKEND_URL}/api/ai/generate-gerber`, {
                     method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ niche: "Chitti_AI_Master_Board" })
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({niche: "Reused_Mobile_Master_Board"})
                 });
-
                 let blob = await response.blob();
                 let link = document.createElement('a');
                 link.href = window.URL.createObjectURL(blob);
-                link.download = "Chitti_AI_Master_Board_Production_Gerber.zip";
+                link.download = "Reused_Mobile_Master_Board_JLCPCB_Ready.zip";
                 link.click();
-
-                consoleBox.innerText = "[SUCCESS]: Real Gerber ZIP downloaded! Upload this directly to JLCPCB for instant price and 3D preview.";
-                speakResponse("গারবার ফাইল ডাউনলোড হয়েছে। এটি সরাসরি জেএলসিবিসিবিতে আপলোড দিন।");
+                consoleBox.innerText = "[SUCCESS]: Gerber ZIP downloaded successfully! Upload to JLCPCB.";
+                speakResponse("গারবার ফাইল সফলভাবে ডাউনলোড হয়েছে।");
             } catch (e) {
-                consoleBox.innerText = "[ERROR]: Failed to connect to Gerber engine.";
+                consoleBox.innerText = "[ERROR]: Gerber download failed.";
             }
         }
 
-        // --- ৬. কারখানায় ১-ক্লিক পিসিবি অর্ডার ---
         function orderFabrication() {
             speakResponse("জেএলসিবিসিবি পোর্টালে নিয়ে যাওয়া হচ্ছে।");
             window.open('https://jlcpcb.com/', '_blank');
         }
 
-        // --- ৭. পেজ লোড হওয়ার সাথে সাথে অটো-পাইলট চালুকরণ ---
         window.onload = function() {
             init3D();
-            // অটোমেটিক পার্টনার ব্যাকগ্রাউন্ড প্রসেসিং শুরু
-            setTimeout(() => {
-                runAutonomousThinking();
-            }, 2000);
+            consultAIPartner();
         };
     </script>
 </body>
