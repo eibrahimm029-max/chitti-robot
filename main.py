@@ -20,8 +20,6 @@ if GEMINI_API_KEY:
     except Exception as e:
         print(f"Gemini Config Error: {e}")
         ai_model = None
-else:
-    ai_model = None
 
 @app.route('/', methods=['GET'])
 def home():
