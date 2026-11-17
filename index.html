@@ -3,63 +3,277 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AVS Neural Production Studio - 24/7 Autonomous AI</title>
+    <title>AVS Neural Production Studio - 4K Autonomous AI</title>
+    <!-- FontAwesome Icons for Professional Look -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; margin: 0; padding: 20px; }
-        .container { max-width: 800px; margin: auto; background: #1e293b; padding: 30px; border-radius: 12px; box-shadow: 0 10px 25px rgba(0,0,0,0.3); }
-        h1 { color: #38bdf8; text-align: center; font-size: 24px; }
-        .status-badge { background: #22c55e; color: white; padding: 5px 12px; border-radius: 20px; font-size: 14px; display: inline-block; }
-        .card { background: #334155; padding: 15px; margin: 15px 0; border-radius: 8px; border-left: 4px solid #38bdf8; }
-        button { background: #0284c7; color: white; border: none; padding: 12px 20px; font-size: 16px; border-radius: 6px; cursor: pointer; width: 100%; margin-top: 10px; }
-        button:hover { background: #0369a1; }
-        pre { background: #0f172a; padding: 15px; border-radius: 6px; overflow-x: auto; color: #38bdf8; }
+        :root {
+            --bg-color: #0b0f19;
+            --card-bg: #1e293b;
+            --accent-color: #38bdf8;
+            --success-color: #22c55e;
+            --text-color: #f8fafc;
+            --border-color: #334155;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: var(--bg-color);
+            color: var(--text-color);
+            margin: 0;
+            padding: 20px;
+        }
+        .app-container {
+            max-width: 900px;
+            margin: auto;
+            background: var(--card-bg);
+            padding: 30px;
+            border-radius: 16px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.5), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+            border: 1px solid var(--border-color);
+        }
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 20px;
+            margin-bottom: 25px;
+        }
+        .logo-area h1 {
+            margin: 0;
+            font-size: 22px;
+            color: var(--accent-color);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 15px;
+        }
+        .notification-bell {
+            position: relative;
+            background: #334155;
+            padding: 10px 12px;
+            border-radius: 50%;
+            cursor: pointer;
+            transition: 0.3s;
+        }
+        .notification-bell:hover {
+            background: var(--accent-color);
+            color: #0f172a;
+        }
+        .notification-badge {
+            position: absolute;
+            top: 2px;
+            right: 2px;
+            background: #ef4444;
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+        }
+        .status-pill {
+            background: rgba(34, 197, 94, 0.15);
+            color: var(--success-color);
+            padding: 6px 14px;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 600;
+            border: 1px solid rgba(34, 197, 94, 0.3);
+        }
+        .grid-cards {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        @media(max-width: 768px) {
+            .grid-cards { grid-template-columns: 1fr; }
+        }
+        .card {
+            background: #0f172a;
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .card h3 {
+            margin-top: 0;
+            font-size: 15px;
+            color: #94a3b8;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+            margin: 0;
+            font-size: 13px;
+        }
+        .feature-list li {
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .feature-list li i { color: var(--accent-color); }
+        
+        .action-btn {
+            background: linear-gradient(135deg, #0284c7, #0369a1);
+            color: white;
+            border: none;
+            padding: 14px 20px;
+            font-size: 16px;
+            font-weight: 600;
+            border-radius: 10px;
+            cursor: pointer;
+            width: 100%;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        .action-btn:hover {
+            background: linear-gradient(135deg, #0369a1, #075985);
+            transform: translateY(-2px);
+        }
+        .output-section {
+            margin-top: 25px;
+            background: #0f172a;
+            padding: 20px;
+            border-radius: 12px;
+            border: 1px solid var(--border-color);
+        }
+        .output-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+        }
+        .output-header h3 { margin: 0; font-size: 16px; color: var(--accent-color); }
+        
+        /* Download Button Style */
+        .download-btn {
+            background: #059669;
+            color: white;
+            border: none;
+            padding: 8px 14px;
+            border-radius: 6px;
+            font-size: 13px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            text-decoration: none;
+            font-weight: 600;
+            transition: 0.2s;
+        }
+        .download-btn:hover { background: #047857; }
+        
+        pre {
+            background: #1e293b;
+            padding: 15px;
+            border-radius: 8px;
+            overflow-x: auto;
+            color: #38bdf8;
+            font-size: 13px;
+            max-height: 300px;
+            margin: 0;
+            border: 1px solid var(--border-color);
+        }
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>AVS Neural Production Studio</h1>
-        <p style="text-align: center;">Status: <span class="status-badge" id="server-status">Connecting...</span></p>
-        
-        <div class="card">
-            <h3>Active Autonomous Core Features:</h3>
-            <ul>
-                <li>24/7 Autonomous Trend Scouting (YouTube & Google API)</li>
-                <li>Advanced Psychological Hook & Script Engine (Shorts & Long)</li>
-                <li>Realistic Voiceover & Audio Synthesis Pipeline</li>
-                <li>Auto-Visual & Video Editing Mapping</li>
-                <li>High-CTR Thumbnail & 100% SEO Meta Generator</li>
-            </ul>
+    <div class="app-container">
+        <!-- Top Header with Notification & Status -->
+        <div class="header">
+            <div class="logo-area">
+                <h1><i class="fa-solid fa-brain"></i> AVS Neural Studio</h1>
+            </div>
+            <div class="header-actions">
+                <div class="notification-bell" title="System Notifications">
+                    <i class="fa-solid fa-bell"></i>
+                    <span class="notification-badge"></span>
+                </div>
+                <div class="status-pill" id="server-status">
+                    <i class="fa-solid fa-circle-dot"></i> Connecting...
+                </div>
+            </div>
         </div>
 
-        <button onclick="triggerProduction()">Trigger Instant AI Production Package</button>
+        <!-- Features Grid -->
+        <div class="grid-cards">
+            <div class="card">
+                <h3><i class="fa-solid fa-robot"></i> Core AI Pillars</h3>
+                <ul class="feature-list">
+                    <li><i class="fa-solid fa-check"></i> 24/7 YouTube Trend Scouting</li>
+                    <li><i class="fa-solid fa-check"></i> Zero-Drop Psychological Hooks</li>
+                    <li><i class="fa-solid fa-check"></i> Neural TTS & Voice Mapping</li>
+                </ul>
+            </div>
+            <div class="card">
+                <h3><i class="fa-solid fa-clapperboard"></i> 4K Video & SEO</h3>
+                <ul class="feature-list">
+                    <li><i class="fa-solid fa-check"></i> Ultra-HD 4K MoviePy Rendering</li>
+                    <li><i class="fa-solid fa-check"></i> High-CTR Thumbnail Strategy</li>
+                    <li><i class="fa-solid fa-check"></i> 100% SEO Optimized Metadata</li>
+                </ul>
+            </div>
+        </div>
 
-        <div class="card" style="margin-top: 20px;">
-            <h3>Latest AI Output / Script Package:</h3>
-            <pre id="output-box">Click the button above to generate a viral script & SEO package instantly...</pre>
+        <!-- Action Trigger Button -->
+        <button class="action-btn" onclick="triggerProduction()">
+            <i class="fa-solid fa-wand-magic-sparkles"></i> Trigger Instant 4K AI Production
+        </button>
+
+        <!-- Output & Download Section -->
+        <div class="output-section">
+            <div class="output-header">
+                <h3><i class="fa-solid fa-terminal"></i> Live Production & Video Package</h3>
+                <!-- Download Icon Button -->
+                <a id="download-link" class="download-btn" href="#" style="display:none;" download>
+                    <i class="fa-solid fa-download"></i> Download 4K Video
+                </a>
+            </div>
+            <pre id="output-box">Click the button above to scout trends, generate scripts, and render 4K video package...</pre>
         </div>
     </div>
 
     <script>
-        // সার্ভার লাইভ চেক করা
+        // Check Server Status on Load
         fetch('/')
             .then(res => res.json())
             .then(data => {
-                document.getElementById('server-status').innerText = data.status;
+                const statusEl = document.getElementById('server-status');
+                statusEl.innerHTML = `<i class="fa-solid fa-circle-dot"></i> ${data.status} (4K Ready)`;
             }).catch(err => {
-                document.getElementById('server-status').innerText = 'OFFLINE';
-                document.getElementById('server-status').style.background = '#ef4444';
+                const statusEl = document.getElementById('server-status');
+                statusEl.innerHTML = `<i class="fa-solid fa-triangle-exclamation"></i> OFFLINE`;
+                statusEl.style.color = '#ef4444';
+                statusEl.style.background = 'rgba(239, 68, 68, 0.15)';
             });
 
-        // ম্যানুয়াল প্রোডাকশন ট্রিগার করার ফাংশন
+        // Trigger Production Function
         function triggerProduction() {
-            document.getElementById('output-box').innerText = "AI is scouting trends and compiling masterpiece package...";
+            const outputBox = document.getElementById('output-box');
+            const downloadBtn = document.getElementById('download-link');
+            
+            outputBox.innerText = "🚀 AI is scouting YouTube trends, mapping scripts, and rendering 4K video effects...";
+            downloadBtn.style.display = "none";
+
             fetch('/trigger-manual-production')
                 .then(res => res.json())
                 .then(data => {
-                    document.getElementById('output-box').innerText = JSON.stringify(data, null, 2);
+                    outputBox.innerText = JSON.stringify(data, null, 2);
+                    // Show download button once production is successful
+                    downloadBtn.style.display = "inline-flex";
+                    downloadBtn.href = "#"; // পরে এখানে রেন্ডার করা ভিডিও ফাইলের লিংক বসবে
                 })
                 .catch(err => {
-                    document.getElementById('output-box').innerText = "Error: " + err;
+                    outputBox.innerText = "❌ Error executing pipeline: " + err;
                 });
         }
     </script>
