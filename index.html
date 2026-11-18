@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AVS Neural Production Studio - 4K Autonomous AI</title>
+    <title>AVS Neural Production Studio - Fully Autonomous AI</title>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         :root {
@@ -15,14 +15,23 @@
             --border-color: #334155;
         }
         body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; }
-        .app-container { max-width: 900px; margin: auto; background: var(--card-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); }
+        .app-container { max-width: 900px; margin: auto; background: var(--card-bg); padding: 30px; border-radius: 16px; border: 1px solid var(--border-color); box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
         .header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 20px; margin-bottom: 25px; }
         .logo-area h1 { margin: 0; font-size: 22px; color: var(--accent-color); display: flex; align-items: center; gap: 10px; }
-        .status-pill { background: rgba(34, 197, 94, 0.15); color: var(--success-color); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; }
-        .action-btn { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border: none; padding: 14px 20px; font-size: 16px; font-weight: 600; border-radius: 10px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; }
+        .status-pill { background: rgba(34, 197, 94, 0.15); color: var(--success-color); padding: 6px 14px; border-radius: 20px; font-size: 13px; font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .action-btn { background: linear-gradient(135deg, #0284c7, #0369a1); color: white; border: none; padding: 16px 20px; font-size: 16px; font-weight: 600; border-radius: 10px; cursor: pointer; width: 100%; display: flex; align-items: center; justify-content: center; gap: 10px; transition: 0.3s; box-shadow: 0 4px 15px rgba(2, 132, 199, 0.4); }
+        .action-btn:hover { background: linear-gradient(135deg, #0369a1, #075985); transform: translateY(-2px); }
         .output-section { margin-top: 25px; background: #0f172a; padding: 20px; border-radius: 12px; border: 1px solid var(--border-color); }
-        .download-btn { background: #059669; color: white; border: none; padding: 10px 18px; border-radius: 6px; font-size: 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 600; margin-top: 15px; }
-        pre { background: #1e293b; padding: 15px; border-radius: 8px; overflow-x: auto; color: #38bdf8; font-size: 13px; max-height: 250px; }
+        
+        /* Direct Video Player Style */
+        .video-container { margin-top: 15px; text-align: center; display: none; }
+        video { width: 100%; max-height: 450px; border-radius: 10px; border: 2px solid var(--border-color); background: #000; outline: none; }
+        
+        .download-btn { background: #059669; color: white; border: none; padding: 12px 24px; border-radius: 8px; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; text-decoration: none; font-weight: 600; margin-top: 15px; transition: 0.2s; }
+        .download-btn:hover { background: #047857; }
+        
+        .ai-details { background: #1e293b; padding: 15px; border-radius: 8px; margin-top: 15px; font-size: 14px; color: #94a3b8; border-left: 4px solid var(--accent-color); text-align: left; }
+        .ai-details span { color: #f8fafc; font-weight: bold; }
     </style>
 </head>
 <body>
@@ -32,20 +41,34 @@
                 <h1><i class="fa-solid fa-brain"></i> AVS Neural Studio</h1>
             </div>
             <div class="status-pill" id="server-status">
-                <i class="fa-solid fa-circle-dot"></i> Connecting...
+                <i class="fa-solid fa-circle-dot"></i> Connecting AI...
             </div>
         </div>
 
         <button class="action-btn" onclick="triggerProduction()">
-            <i class="fa-solid fa-wand-magic-sparkles"></i> Trigger Instant 4K AI Production & Video Render
+            <i class="fa-solid fa-wand-magic-sparkles"></i> 🤖 AI: Start Autonomous Production & Render Video
         </button>
 
         <div class="output-section">
-            <h3><i class="fa-solid fa-terminal"></i> Live Production & Video Package</h3>
-            <pre id="output-box">Click the button above to start AI video generation...</pre>
-            <a id="download-link" class="download-btn" href="#" style="display:none;" target="_blank" download>
-                <i class="fa-solid fa-download"></i> Download Rendered Video (MP4)
-            </a>
+            <h3 id="status-text" style="color: #38bdf8; margin-top:0;"><i class="fa-solid fa-terminal"></i> AI Studio Status: Ready</h3>
+            
+            <!-- AI Decision Summary Box -->
+            <div id="ai-info" class="ai-details" style="display:none;">
+                <p>📌 <b>Niche & Trend:</b> <span id="niche-text"></span></p>
+                <p>💡 <b>Zero-Drop Hook:</b> <span id="hook-text"></span></p>
+                <p>🏷️ <b>SEO Title:</b> <span id="title-text"></span></p>
+            </div>
+
+            <!-- Direct Video Player (YouTube / Mobile Camera Style) -->
+            <div id="video-box" class="video-container">
+                <video id="ai-video-player" controls autoplay muted>
+                    Your browser does not support the video tag.
+                </video>
+                <br>
+                <a id="download-btn" class="download-btn" href="#" download>
+                    <i class="fa-solid fa-download"></i> Download Final Video (MP4)
+                </a>
+            </div>
         </div>
     </div>
 
@@ -62,25 +85,43 @@
                 document.getElementById('server-status').style.color = '#ef4444';
             });
 
-        // Trigger Production
+        // Trigger Autonomous Production
         function triggerProduction() {
-            const outputBox = document.getElementById('output-box');
-            const downloadBtn = document.getElementById('download-link');
-            
-            outputBox.innerText = "🚀 AI is scouting trends, compiling script, and rendering 4K video file...";
-            downloadBtn.style.display = "none";
+            const statusText = document.getElementById('status-text');
+            const videoBox = document.getElementById('video-box');
+            const aiInfo = document.getElementById('ai-info');
+            const videoPlayer = document.getElementById('ai-video-player');
+            const downloadBtn = document.getElementById('download-link-btn');
+
+            statusText.innerHTML = "🚀 AI Brain is scanning viral trends, writing scripts, and rendering 4K video...";
+            videoBox.style.display = "none";
+            aiInfo.style.display = "none";
 
             fetch(BACKEND_URL + '/trigger-manual-production')
                 .then(res => res.json())
                 .then(data => {
-                    outputBox.innerText = JSON.stringify(data, null, 2);
+                    statusText.innerHTML = "✅ Video Produced Successfully by AI!";
+                    
+                    // Show AI Decisions
+                    if(data.autonomous_ai_decision) {
+                        aiInfo.style.display = "block";
+                        document.getElementById('niche-text').innerText = data.autonomous_ai_decision.scanned_trend || "Viral Tech Trend";
+                        document.getElementById('hook-text').innerText = data.autonomous_ai_decision.retention_hook || "Amazing Hook";
+                        document.getElementById('title-text').innerText = data.autonomous_ai_decision.seo_title || "Viral Video 2026";
+                    }
+
+                    // Load Direct Video Player
                     if (data.video_download_url) {
-                        downloadBtn.style.display = "inline-flex";
+                        videoBox.style.display = "block";
+                        videoPlayer.src = data.video_download_url;
+                        videoPlayer.load();
+                        
+                        const downloadBtn = document.getElementById('download-btn');
                         downloadBtn.href = data.video_download_url;
                     }
                 })
                 .catch(err => {
-                    outputBox.innerText = "❌ Error executing pipeline: " + err;
+                    statusText.innerHTML = "❌ Error: " + err;
                 });
         }
     </script>
