@@ -78,7 +78,7 @@
     .mod-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 4px; }
     .tag-on { color: var(--success); font-size: 0.78rem; }
     .tag-off { color: var(--muted); font-size: 0.78rem; }
-    .ev-list { margin-top: 10px; max-height: 210px; overflow-y: auto; }
+    .ev-list { margin-top: 10px; max-height: 220px; overflow-y: auto; }
     .ev-row { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-size: 0.82rem; }
   </style>
 </head>
@@ -87,7 +87,7 @@
     <header>
       <div>
         <h1>AI Video Production Studio</h1>
-        <div class="sub">Gemini Script · Pixabay &amp; NASA Ready · Refined TTS · MoviePy (1s–15s)</div>
+        <div class="sub">Gemini Script · Pixabay &amp; NASA Vault · Refined Male/Female TTS · MoviePy (1s–10s)</div>
       </div>
       <div class="header-right">
         <div class="stage-pill"><span class="dot" id="stage-dot"></span><span id="live-stage-badge">প্রস্তুত (IDLE)</span></div>
@@ -100,12 +100,12 @@
 
     <div class="card" id="monitor-panel">
       <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
-        <strong>Real-Time Brain &amp; Module Flow</strong>
+        <strong>Real-Time Connection, Download &amp; Signal Flow</strong>
         <span class="sub" id="monitor-sync-meta">সিঙ্ক হচ্ছে...</span>
       </div>
       <div class="mod-grid" id="monitor-modules"></div>
       <div style="margin-top:12px;">
-        <label>Recent Live Signals &amp; Fallbacks</label>
+        <label>Live API Connections, Downloads &amp; Signals</label>
         <div class="ev-list" id="monitor-events"></div>
       </div>
     </div>
@@ -126,28 +126,30 @@
           <input id="topic" type="text" placeholder="যেমন: এআই কীভাবে কাজ করে?" required />
         </div>
         <div>
-          <label for="language">Language &amp; Voice</label>
+          <label for="language">Voice &amp; Language</label>
           <select id="language">
-            <option value="Bengali" selected>Bengali (বাংলা · মেয়ে)</option>
-            <option value="Bengali Male">Bengali Male (বাংলা · ছেলে)</option>
+            <option value="Bengali Female" selected>বাংলা · মেয়েদের কণ্ঠ (Female)</option>
+            <option value="Bengali Male">বাংলা · ছেলেদের কণ্ঠ (Male)</option>
             <option value="English">English</option>
             <option value="Hindi">Hindi</option>
           </select>
         </div>
         <div>
-          <label for="format_type">Format</label>
+          <label for="format_type">Video Size &amp; Format</label>
           <select id="format_type">
-            <option value="YouTube Shorts">YouTube Shorts</option>
-            <option value="Long Video">Long Video</option>
-            <option value="Facebook Reels">Facebook Reels</option>
+            <option value="Short Video (9:16)" selected>Short Video (9:16 · Reels/Shorts)</option>
+            <option value="Long Video (16:9)">Long Video (16:9 · YouTube)</option>
           </select>
         </div>
         <div>
-          <label for="duration">Duration</label>
-          <select id="duration">
-            <option value="30 seconds">30 seconds</option>
-            <option value="60 seconds" selected>60 seconds</option>
-            <option value="3 minutes">3 minutes</option>
+          <label for="clip_seconds">Clip Duration (1s–10s)</label>
+          <select id="clip_seconds">
+            <option value="1">1 second</option>
+            <option value="2">2 seconds</option>
+            <option value="3">3 seconds</option>
+            <option value="4">4 seconds</option>
+            <option value="5" selected>5 seconds</option>
+            <option value="10">10 seconds</option>
           </select>
         </div>
         <div>
@@ -161,14 +163,14 @@
       </div>
       <div class="actions">
         <button type="submit" id="gen-btn">Generate Script &amp; Plan</button>
-        <button type="button" class="secondary" id="tts-btn">Generate Free Voice (TTS)</button>
-        <button type="button" class="secondary" id="clip-btn">Test MoviePy Clip</button>
-        <button type="button" class="secondary" id="step-clip-btn">1s–5s Fast Step Clips</button>
+        <button type="button" class="secondary" id="tts-btn">Generate Refined Voice (TTS)</button>
+        <button type="button" class="secondary" id="clip-btn">Build Selected Clip</button>
+        <button type="button" class="secondary" id="step-clip-btn">1s–10s Step Sequence</button>
       </div>
     </form>
 
     <div class="card" id="media-card" style="display:none;">
-      <label>Audio / Clip Output</label>
+      <label>Audio / Clip Output &amp; Live Activity</label>
       <div id="media-out"></div>
     </div>
 
@@ -192,7 +194,7 @@
         <div id="scenes"></div>
       </div>
       <div class="card">
-        <label>Media Sources &amp; Vault Status</label>
+        <label>Connected APIs, Downloads &amp; Vault Status</label>
         <pre id="api-info"></pre>
       </div>
     </div>
@@ -234,6 +236,14 @@
       }
     }
 
+    function renderLiveFeedIntoMedia(events) {
+      if (!Array.isArray(events) || !events.length) return "";
+      const top = events.slice(0, 4).map(
+        (ev) => `<div class="ev-row"><strong>[${ev.status}] ${ev.from} → ${ev.to}:</strong> ${ev.detail}</div>`
+      ).join("");
+      return `<div class="ev-list">${top}</div>`;
+    }
+
     async function fetchBrainMonitor() {
       try {
         const res = await fetch("/api/brain-monitor", { cache: "no-store" });
@@ -262,11 +272,11 @@
           }
           const evWrap = document.getElementById("monitor-events");
           if (evWrap && Array.isArray(tel.recent_events)) {
-            evWrap.innerHTML = tel.recent_events.slice(0, 8).map((ev) => `
+            evWrap.innerHTML = tel.recent_events.slice(0, 10).map((ev) => `
               <div class="ev-row">
                 <strong>[${ev.status}] ${ev.from} → ${ev.to}:</strong> ${ev.detail}
               </div>
-            `).join("") || `<div class="sub">এখনো কোনো সাম্প্রতিক সিগন্যাল নেই।</div>`;
+            `).join("") || `<div class="sub">এখনো কোনো সাম্প্রতিক সংযোগ বা ডাউনলোড সিগন্যাল নেই।</div>`;
           }
         }
         return data;
@@ -275,7 +285,7 @@
       }
     }
 
-    function startStagePolling(ms = 1800) {
+    function startStagePolling(ms = 1600) {
       if (monitorInterval) clearInterval(monitorInterval);
       fetchBrainMonitor();
       monitorInterval = setInterval(fetchBrainMonitor, ms);
@@ -288,12 +298,12 @@
       }
     }
 
-    document.getElementById("monitor-toggle-btn").addEventListener("click", async () => {
+    document.getElementById("monitor-toggle-btn").addEventListener("click", () => {
       monitorOpen = !monitorOpen;
       const panel = document.getElementById("monitor-panel");
       panel.style.display = monitorOpen ? "block" : "none";
       if (monitorOpen) {
-        startStagePolling(2500);
+        startStagePolling(2000);
       } else {
         stopStagePolling();
       }
@@ -319,10 +329,11 @@
       e.preventDefault();
       clearErr();
       const btn = document.getElementById("gen-btn");
+      const secVal = Math.max(1, Math.min(parseInt(document.getElementById("clip_seconds").value, 10) || 5, 10));
       btn.disabled = true;
       btn.textContent = "তৈরি হচ্ছে...";
-      setStageUi("আইডিয়া ও সিন প্ল্যান তৈরি হচ্ছে...", true);
-      startStagePolling(1800);
+      setStageUi("আইডিয়া, সিন প্ল্যান ও মিডিয়া সংযোগ চলছে...", true);
+      startStagePolling(1600);
       try {
         const res = await fetch("/api/generate-plan", {
           method: "POST",
@@ -332,7 +343,7 @@
             topic: document.getElementById("topic").value,
             language: document.getElementById("language").value,
             format_type: document.getElementById("format_type").value,
-            duration: document.getElementById("duration").value,
+            duration: `${secVal} seconds`,
             visual_style: document.getElementById("visual_style").value,
           }),
         });
@@ -354,7 +365,7 @@
         (data.plan.scenes || []).forEach((s, i) => {
           const d = document.createElement("div");
           d.className = "scene";
-          d.innerHTML = `<strong>Scene ${s.scene_number || i + 1} (${s.duration || ""})</strong>
+          d.innerHTML = `<strong>Scene ${s.scene_number || i + 1} (${s.duration || `${secVal}s`})</strong>
             <div>Visual: ${s.visual_prompt || ""}</div>
             <div>Narration: ${s.narration || ""}</div>
             <div>Text: ${s.on_screen_text || ""}</div>`;
@@ -377,7 +388,7 @@
       const text = document.getElementById("script").textContent || document.getElementById("topic").value;
       const lang = document.getElementById("language").value;
       btn.disabled = true;
-      setStageUi("ভয়েস তৈরি ও পরিশোধন হচ্ছে...", true);
+      setStageUi("ভয়েস তৈরি ও পরিশোধন ফিল্টার চলছে...", true);
       startStagePolling(1500);
       try {
         const res = await fetch("/api/tts", {
@@ -387,8 +398,11 @@
         });
         const data = await parseJsonSafe(res);
         if (!res.ok || !data.ok) throw new Error(data.error || "TTS ব্যর্থ হয়েছে");
+        const mon = await fetchBrainMonitor();
         document.getElementById("media-card").style.display = "block";
-        document.getElementById("media-out").innerHTML = `<audio controls src="${data.file}"></audio>`;
+        document.getElementById("media-out").innerHTML =
+          `<audio controls src="${data.file}"></audio>` +
+          renderLiveFeedIntoMedia(mon && mon.telemetry && mon.telemetry.recent_events);
       } catch (err) {
         showErr(err.message);
       } finally {
@@ -401,14 +415,16 @@
     document.getElementById("clip-btn").addEventListener("click", async () => {
       clearErr();
       const btn = document.getElementById("clip-btn");
+      const secVal = Math.max(1, Math.min(parseInt(document.getElementById("clip_seconds").value, 10) || 5, 10));
+      const fmtVal = document.getElementById("format_type").value;
       btn.disabled = true;
-      setStageUi("MoviePy ক্লিপ তৈরি হচ্ছে...", true);
+      setStageUi(`${secVal}s ক্লিপ ডাউনলোড ও রেন্ডার হচ্ছে...`, true);
       startStagePolling(1500);
       try {
         let res = await fetch("/api/build-clips", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ clip_seconds: 5, clip_count: 2, label: "sample_clip" }),
+          body: JSON.stringify({ clip_seconds: secVal, clip_count: 1, label: "selected_clip", format_type: fmtVal }),
         });
         if (res.status === 404) {
           res = await fetch("/api/moviepy-sample", { method: "POST" });
@@ -416,8 +432,11 @@
         const data = await parseJsonSafe(res);
         if (!res.ok || !data.ok) throw new Error(data.error || "ক্লিপ তৈরি হয়নি");
         const videoSrc = data.merged_file || data.file;
+        const mon = await fetchBrainMonitor();
         document.getElementById("media-card").style.display = "block";
-        document.getElementById("media-out").innerHTML = `<video controls width="360" src="${videoSrc}"></video>`;
+        document.getElementById("media-out").innerHTML =
+          `<video controls width="360" src="${videoSrc}"></video>` +
+          renderLiveFeedIntoMedia(mon && mon.telemetry && mon.telemetry.recent_events);
       } catch (err) {
         showErr(err.message);
       } finally {
@@ -430,20 +449,26 @@
     document.getElementById("step-clip-btn").addEventListener("click", async () => {
       clearErr();
       const btn = document.getElementById("step-clip-btn");
+      const maxSec = Math.max(1, Math.min(parseInt(document.getElementById("clip_seconds").value, 10) || 5, 10));
+      const stepList = maxSec >= 10 ? [1, 2, 3, 5, 10] : Array.from({ length: maxSec }, (_, i) => i + 1);
+      const fmtVal = document.getElementById("format_type").value;
       btn.disabled = true;
-      setStageUi("১s–৫s ধাপে ক্লিপ তৈরি হচ্ছে...", true);
+      setStageUi(`১s–${maxSec}s ধাপে ক্লিপ ডাউনলোড ও এডিটিং চলছে...`, true);
       startStagePolling(1500);
       try {
         const res = await fetch("/api/build-steps", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ durations: [1, 2, 3, 4, 5], label: "step_clip" }),
+          body: JSON.stringify({ durations: stepList, label: "step_clip", format_type: fmtVal }),
         });
         const data = await parseJsonSafe(res);
         if (!res.ok || !data.ok) throw new Error(data.error || "স্টেপ ক্লিপ তৈরি হয়নি");
         const videoSrc = data.merged_file || (data.clips && data.clips[0] && data.clips[0].file);
+        const mon = await fetchBrainMonitor();
         document.getElementById("media-card").style.display = "block";
-        document.getElementById("media-out").innerHTML = `<video controls width="360" src="${videoSrc}"></video>`;
+        document.getElementById("media-out").innerHTML =
+          `<video controls width="360" src="${videoSrc}"></video>` +
+          renderLiveFeedIntoMedia(mon && mon.telemetry && mon.telemetry.recent_events);
       } catch (err) {
         showErr(err.message);
       } finally {
