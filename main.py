@@ -66,6 +66,7 @@ CUSTOM_ASSET_VAULT = {
     "science_space": [],
     "tech_cinematic": [],
 }
+LATEST_STOCK_LOCKED_URLS = []
 
 STATE_LOCK = threading.Lock()
 LIVE_MONITOR = {
@@ -115,13 +116,6 @@ def set_live_stage(stage_code: str, stage_label_bn: str, task_name: str | None =
         LIVE_MONITOR["last_sync_at"] = _now_iso()
         if count_request:
             LIVE_MONITOR["total_requests"] += 1
-
-
-def set_sync_state(state: str, task_name: str | None = None):
-    if state == "PROCESSING":
-        set_live_stage("PROCESSING", f"কাজ চলছে: {task_name or 'প্রসেসিং'}", task_name, count_request=True)
-    else:
-        set_live_stage("IDLE", "প্রস্তুত (IDLE)", None, count_request=False)
 
 
 def _get_fernet():
@@ -299,16 +293,16 @@ class MasterBrainNeuralEngine:
                 "name": "Edge-TTS & Voice Refiner",
                 "online": EDGE_TTS_AVAILABLE,
                 "connects_to": ["FFmpegRefiner", "OutputsFolder"],
-                "capability": "টেক্সট ছাঁটাই, ভয়েস তৈরি ও কণ্ঠ স্পষ্ট/সমান করা",
+                "capability": "টেক্সট ছাঁটাই, ছেলে/মেয়ে ভয়েস তৈরি ও কণ্ঠ স্পষ্ট/সমান করা",
                 "fallback": "ffmpeg না থাকলে নিরাপদ অডিও আউটপুট ও ত্রুটি বার্তা",
             },
             {
                 "id": "moviepy",
                 "name": "MoviePy Clip Sequencer",
                 "online": MOVIEPY_AVAILABLE,
-                "connects_to": ["OutputsFolder"],
-                "capability": "১–১৫ সেকেন্ডের ছোট ক্লিপ ধাপে ধাপে তৈরি, মার্জ ও হালকা মিউজিক ব্লেন্ড",
-                "fallback": "সর্বোচ্চ ১৫s সীমা ও ডাউনলোডের পর ফাইল মুছে ফেলা",
+                "connects_to": ["StockVault", "OutputsFolder"],
+                "capability": "১–১০s ধাপে শর্ট/লং সাইজ ক্লিপ তৈরি, মার্জ ও হালকা মিউজিক ব্লেন্ড",
+                "fallback": "সর্বোচ্চ ১০s সীমা, ColorClip ফলব্যাক ও ডাউনলোডের পর ফাইল মুছে ফেলা",
             },
             {
                 "id": "youtube_pixverse",
@@ -371,7 +365,7 @@ async def _save_tts_audio(text: str, voice: str, out_path: str, rate: str = "-4%
     await communicate.save(out_path)
 
 
-def generate_free_tts(text: str, language: str = "Bengali", rate: str = "-4%", pitch: str = "+1Hz") -> dict:
+def generate_free_tts(text: str, language: str = "Bengali Female", rate: str = "-4%", pitch: str = "+1Hz") -> dict:
     if not EDGE_TTS_AVAILABLE:
         push_live_event("EdgeTTS", "Client", "ERROR", "edge-tts ইনস্টল নেই")
         return {"ok": False, "error": "edge-tts ইনস্টল করা নেই।"}
@@ -415,7 +409,6 @@ def generate_free_tts(text: str, language: str = "Bengali", rate: str = "-4%", p
                 "download_url": f"/api/download/{final_filename}",
             }
 
-        # ffmpeg না থাকলে কাঁচা ফাইলটিকেই মূল আউটপুট নামে সংরক্ষণ
         fallback_filename = f"tts_{ts}.mp3"
         fallback_path = os.path.join(OUTPUT_DIR, fallback_filename)
         os.replace(raw_path, fallback_path)
@@ -441,30 +434,174 @@ def generate_free_tts(text: str, language: str = "Bengali", rate: str = "-4%", p
         set_live_stage("IDLE", "প্রস্তুত (IDLE)", None, count_request=False)
 
 
-def _render_clip_sequence(durations: list[int], label: str = "fast_clip", bg_music_path: str | None = None) -> dict:
+def _resolve_video_size(format_type: str | None) -> tuple[int, int]:
+    fmt = (format_type or "").lower()
+    if "short" in fmt or "9:16" in fmt or "reel" in fmt:
+        return (360, 640)
+    return (640, 360)
+
+
+def _collect_candidate_locked_urls(category: str | None = None) -> list[dict]:
+    candidates = []
+    for item in reversed(LATEST_STOCK_LOCKED_URLS):
+        if isinstance(item, dict) and item.get("encrypted"):
+            candidates.append(item)
+
+    if category and category in CUSTOM_ASSET_VAULT:
+        for item in reversed(CUSTOM_ASSET_VAULT[category]):
+            if isinstance(item, dict) and item.get("encrypted"):
+                candidates.append(item)
+    else:
+        for cat_items in CUSTOM_ASSET_VAULT.values():
+            for item in reversed(cat_items):
+                if isinstance(item, dict) and item.get("encrypted"):
+                    candidates.append(item)
+
+    for cache_val in reversed(list(MEDIA_VAULT_CACHE.values())):
+        if isinstance(cache_val, list):
+            for entry in cache_val:
+                if isinstance(entry, dict):
+                    locked = entry.get("locked_url") or entry.get("locked_preview")
+                    if isinstance(locked, dict) and locked.get("encrypted"):
+                        candidates.append(locked)
+
+    seen_ids = set()
+    unique = []
+    for c in candidates:
+        cid = c.get("id") or c.get("encrypted")[:20]
+        if cid not in seen_ids:
+            seen_ids.add(cid)
+            unique.append(c)
+    return unique
+
+
+def _download_stock_clip(locked_obj: dict, dest_path: str) -> bool:
+    token = locked_obj.get("encrypted")
+    mode = locked_obj.get("mode") or "fernet"
+    url = decrypt_link(token, mode=mode)
+    if not url or not url.startswith(("http://", "https://")):
+        return False
+
+    try:
+        push_live_event("StockVault", "Downloader", "SYNCING", f"ক্লিপ ডাউনলোড হচ্ছে ({locked_obj.get('id', 'link')})")
+        with requests.get(url, stream=True, timeout=15) as r:
+            r.raise_for_status()
+            content_type = (r.headers.get("content-type") or "").lower()
+            if "text/html" in content_type or "image/" in content_type:
+                return False
+
+            max_bytes = 25 * 1024 * 1024
+            written = 0
+            with open(dest_path, "wb") as f:
+                for chunk in r.iter_content(chunk_size=65536):
+                    if chunk:
+                        written += len(chunk)
+                        if written > max_bytes:
+                            break
+                        f.write(chunk)
+
+        ok = os.path.exists(dest_path) and os.path.getsize(dest_path) > 1024
+        if ok:
+            push_live_event("Downloader", "MoviePy", "OK", "স্টক ক্লিপ ডাউনলোড সম্পন্ন")
+        return ok
+    except Exception:
+        if os.path.exists(dest_path):
+            try:
+                os.remove(dest_path)
+            except Exception:
+                pass
+        return False
+
+
+def _trim_and_resize_clip(src_video_path: str, target_seconds: int, size: tuple[int, int]):
+    clip = VideoFileClip(src_video_path)
+    try:
+        dur = float(clip.duration or 0)
+        if dur <= 0:
+            raise ValueError("ভিডিওর দৈর্ঘ্য পাওয়া যায়নি")
+        end_t = min(float(target_seconds), dur)
+        sub = clip.subclipped(0.0, end_t) if hasattr(clip, "subclipped") else clip.subclip(0.0, end_t)
+        if hasattr(sub, "resized"):
+            sub = sub.resized(size)
+        elif hasattr(sub, "resize"):
+            sub = sub.resize(size)
+        return sub, clip
+    except Exception:
+        clip.close()
+        raise
+
+
+def _render_clip_sequence(
+    durations: list[int],
+    label: str = "fast_clip",
+    bg_music_path: str | None = None,
+    category: str | None = None,
+    format_type: str | None = None,
+) -> dict:
     if not MOVIEPY_AVAILABLE:
         push_live_event("MoviePy", "Client", "ERROR", "MoviePy ব্যবহারযোগ্য নয়")
         return {"ok": False, "error": "MoviePy ব্যবহারযোগ্য নয়।"}
 
-    safe_steps = [max(1, min(int(d), 15)) for d in durations[:6]]
+    safe_steps = [max(1, min(int(d), 10)) for d in durations[:6]]
+    target_size = _resolve_video_size(format_type)
     created_files = []
     part_paths = []
+    temp_downloads = []
     palette = [(20, 30, 55), (45, 25, 65), (18, 52, 58), (60, 32, 38), (28, 48, 42), (52, 40, 24)]
+    candidates = _collect_candidate_locked_urls(category=category)
 
-    set_live_stage("CLIP_RENDERING", f"ক্লিপ তৈরি হচ্ছে ({safe_steps}s)...", f"MoviePy {label}", count_request=True)
+    set_live_stage("CLIP_RENDERING", f"ক্লিপ তৈরি হচ্ছে ({safe_steps}s · {target_size[0]}x{target_size[1]})...", f"MoviePy {label}", count_request=True)
     try:
         for idx, sec in enumerate(safe_steps):
-            color = palette[idx % len(palette)]
-            clip = ColorClip(size=(640, 360), color=color, duration=sec)
-            trimmed = clip.subclipped(0, sec) if hasattr(clip, "subclipped") else clip.subclip(0, sec)
             fname = f"{label}_part_{idx + 1}_{sec}s_{int(time.time())}.mp4"
             fpath = os.path.join(OUTPUT_DIR, fname)
-            trimmed.write_videofile(fpath, fps=20, codec="libx264", preset="ultrafast", audio=False, logger=None)
-            trimmed.close()
-            clip.close()
+            used_stock = False
+
+            for c_idx in range(len(candidates)):
+                cand = candidates[(idx + c_idx) % len(candidates)]
+                tmp_src = os.path.join(OUTPUT_DIR, f"tmp_src_{idx}_{c_idx}_{int(time.time())}.mp4")
+                if _download_stock_clip(cand, tmp_src):
+                    temp_downloads.append(tmp_src)
+                    source_clip = None
+                    sub_clip = None
+                    try:
+                        sub_clip, source_clip = _trim_and_resize_clip(tmp_src, sec, target_size)
+                        sub_clip.write_videofile(
+                            fpath,
+                            fps=20,
+                            codec="libx264",
+                            preset="ultrafast",
+                            audio=False,
+                            logger=None,
+                        )
+                        used_stock = True
+                        push_live_event("StockVault", "MoviePy", "OK", f"আসল স্টক ক্লিপ ({sec}s) তৈরি হয়েছে")
+                        break
+                    except Exception as clip_exc:
+                        push_live_event("StockClip", "Fallback", "FALLBACK", f"ক্লিপ কাটায় ত্রুটি: {str(clip_exc)}", is_fallback=True)
+                    finally:
+                        if sub_clip:
+                            try:
+                                sub_clip.close()
+                            except Exception:
+                                pass
+                        if source_clip:
+                            try:
+                                source_clip.close()
+                            except Exception:
+                                pass
+
+            if not used_stock:
+                color = palette[idx % len(palette)]
+                clip = ColorClip(size=target_size, color=color, duration=sec)
+                trimmed = clip.subclipped(0, sec) if hasattr(clip, "subclipped") else clip.subclip(0, sec)
+                trimmed.write_videofile(fpath, fps=20, codec="libx264", preset="ultrafast", audio=False, logger=None)
+                trimmed.close()
+                clip.close()
+                push_live_event("MoviePy", "ColorFallback", "FALLBACK", f"স্টক না থাকায় {sec}s ফলব্যাক ক্লিপ তৈরি হয়েছে", is_fallback=True)
+
             part_paths.append(fpath)
-            created_files.append(f"/{OUTPUT_DIR}/{fname}")
-            push_live_event("MoviePy", "OutputsFolder", "OK", f"ক্লিপ {idx + 1} ({sec}s) তৈরি হয়েছে")
+            created_files.append({"seconds": sec, "stock_used": used_stock, "file": f"/{OUTPUT_DIR}/{fname}"})
 
         set_live_stage("VIDEO_MERGING", "ক্লিপগুলো যুক্ত করে এডিটিং চলছে...", "Merge Clips", count_request=False)
         merged_name = f"{label}_merged_{int(time.time())}.mp4"
@@ -503,14 +640,15 @@ def _render_clip_sequence(durations: list[int], label: str = "fast_clip", bg_mus
         for c in loaded:
             c.close()
 
-        push_live_event("MoviePy", "OutputsFolder", "OK", f"মার্জড ভিডিও প্রস্তুত: {merged_name}")
+        push_live_event("MoviePy", "OutputsFolder", "OK", f"চূড়ান্ত ভিডিও প্রস্তুত: {merged_name}")
         return {
             "ok": True,
             "mode": label,
+            "size": f"{target_size[0]}x{target_size[1]}",
             "clip_seconds": safe_steps[0] if len(safe_steps) == 1 else safe_steps,
             "steps_seconds": safe_steps,
             "created_count": len(created_files),
-            "files": created_files,
+            "clips": created_files,
             "merged_file": f"/{OUTPUT_DIR}/{merged_name}",
             "download_url": f"/api/download/{merged_name}",
         }
@@ -518,13 +656,19 @@ def _render_clip_sequence(durations: list[int], label: str = "fast_clip", bg_mus
         push_live_event("MoviePy", "Client", "ERROR", str(exc))
         return {"ok": False, "error": f"ক্লিপ তৈরিতে সমস্যা হয়েছে: {str(exc)}"}
     finally:
+        for tmp_f in temp_downloads:
+            if os.path.exists(tmp_f):
+                try:
+                    os.remove(tmp_f)
+                except Exception:
+                    pass
         set_live_stage("IDLE", "প্রস্তুত (IDLE)", None, count_request=False)
 
 
-def build_sequential_clips(clip_seconds: int = 5, clip_count: int = 3, label: str = "fast_clip") -> dict:
-    safe_seconds = max(1, min(int(clip_seconds), 15))
+def build_sequential_clips(clip_seconds: int = 5, clip_count: int = 3, label: str = "fast_clip", format_type: str | None = None) -> dict:
+    safe_seconds = max(1, min(int(clip_seconds), 10))
     safe_count = max(1, min(int(clip_count), 6))
-    return _render_clip_sequence([safe_seconds] * safe_count, label=label)
+    return _render_clip_sequence([safe_seconds] * safe_count, label=label, format_type=format_type)
 
 
 @app.route("/")
@@ -568,6 +712,8 @@ def api_encrypt_link():
         return jsonify({"ok": False, "error": "লিংক দেওয়া হয়নি।"}), 400
     record = encrypt_link(url)
     CUSTOM_ASSET_VAULT.setdefault(category, []).append(record)
+    LATEST_STOCK_LOCKED_URLS.append(record)
+    LATEST_STOCK_LOCKED_URLS[:] = LATEST_STOCK_LOCKED_URLS[-20:]
     return jsonify({"ok": True, "category": category, "record": record})
 
 
@@ -580,27 +726,35 @@ def generate_plan():
     data = request.get_json(silent=True) or {}
     niche = (data.get("niche") or "Tech & AI").strip()
     topic = (data.get("topic") or "বিজ্ঞান ও প্রযুক্তি").strip()
-    language = (data.get("language") or "Bengali").strip()
+    language = (data.get("language") or "Bengali Female").strip()
+    format_type = (data.get("format_type") or "Short Video (9:16)").strip()
+    duration = (data.get("duration") or "5 seconds").strip()
+    visual_style = (data.get("visual_style") or "Cinematic Dark AI").strip()
     category = neural_brain.route_category(niche, topic)
 
     prompt = f"""
 Create a short video production plan in {language}.
 Niche: {niche}
 Topic: {topic}
-Keep scenes concise (up to 15s each). Provide simple English search keywords for stock/space media.
+Format: {format_type}
+Duration: {duration}
+Visual Style: {visual_style}
+Keep scenes concise (1s to 10s each). Provide simple English search keywords for stock/space media.
 
 Return ONLY valid JSON:
 {{
   "title": "",
   "hook": "",
   "media_search_query": "",
+  "thumbnail_prompt": "",
   "voiceover_script": "",
   "scenes": [
     {{
       "scene_number": 1,
       "duration": "5s",
       "visual_prompt": "",
-      "narration": ""
+      "narration": "",
+      "on_screen_text": ""
     }}
   ]
 }}
@@ -623,14 +777,26 @@ Return ONLY valid JSON:
                 query = plan.get("media_search_query") or topic
                 push_live_event("Gemini", "MasterBrain", "OK", f"প্ল্যান তৈরি সম্পন্ন; কিওয়ার্ড: {query}")
 
+                nasa_items = neural_brain.search_nasa_library(query, media_type="video", limit=3)
+                pixabay_items = neural_brain.search_pixabay_videos(query, per_page=3)
+
+                for p_item in pixabay_items:
+                    if isinstance(p_item.get("locked_url"), dict):
+                        LATEST_STOCK_LOCKED_URLS.append(p_item["locked_url"])
+                for n_item in nasa_items:
+                    if isinstance(n_item.get("locked_preview"), dict):
+                        LATEST_STOCK_LOCKED_URLS.append(n_item["locked_preview"])
+                LATEST_STOCK_LOCKED_URLS[:] = LATEST_STOCK_LOCKED_URLS[-20:]
+
                 return jsonify({
                     "status": "SUCCESS",
                     "model": GEMINI_MODEL,
                     "category": category,
+                    "format_type": format_type,
                     "plan": plan,
                     "media_sources": {
-                        "nasa": neural_brain.search_nasa_library(query, media_type="video", limit=3),
-                        "pixabay": neural_brain.search_pixabay_videos(query, per_page=3),
+                        "nasa": nasa_items,
+                        "pixabay": pixabay_items,
                         "vault_count": len(CUSTOM_ASSET_VAULT.get(category, [])),
                     },
                 })
@@ -655,7 +821,7 @@ Return ONLY valid JSON:
 def api_tts():
     data = request.get_json(silent=True) or {}
     text = data.get("text") or ""
-    language = data.get("language") or "Bengali"
+    language = data.get("language") or "Bengali Female"
     rate = data.get("rate") or "-4%"
     pitch = data.get("pitch") or "+1Hz"
     result = generate_free_tts(text, language, rate=rate, pitch=pitch)
@@ -666,9 +832,10 @@ def api_tts():
 def api_build_clips():
     data = request.get_json(silent=True) or {}
     clip_seconds = data.get("clip_seconds", 5)
-    clip_count = data.get("clip_count", 3)
-    label = data.get("label", "fast_clip")
-    result = build_sequential_clips(clip_seconds=clip_seconds, clip_count=clip_count, label=label)
+    clip_count = data.get("clip_count", 1)
+    label = data.get("label") or "fast_clip"
+    format_type = data.get("format_type")
+    result = build_sequential_clips(clip_seconds=clip_seconds, clip_count=clip_count, label=label, format_type=format_type)
     return jsonify(result), (200 if result.get("ok") else 400)
 
 
@@ -680,7 +847,8 @@ def api_build_steps():
         durations = [1, 2, 3, 4, 5]
     label = data.get("label") or "step_clip"
     bg_music_path = data.get("bg_music_path")
-    result = _render_clip_sequence(durations=durations, label=label, bg_music_path=bg_music_path)
+    format_type = data.get("format_type")
+    result = _render_clip_sequence(durations=durations, label=label, bg_music_path=bg_music_path, format_type=format_type)
     return jsonify(result), (200 if result.get("ok") else 400)
 
 
