@@ -4,6 +4,8 @@ from datetime import datetime, timezone
 import hashlib
 import json
 import os
+import shutil
+import subprocess
 import threading
 import time
 from flask import Flask, jsonify, request, send_file, send_from_directory
@@ -25,11 +27,11 @@ except Exception:
     EDGE_TTS_AVAILABLE = False
 
 try:
-    from moviepy import ColorClip, VideoFileClip, concatenate_videoclips
+    from moviepy import AudioFileClip, ColorClip, CompositeAudioClip, VideoFileClip, concatenate_videoclips
     MOVIEPY_AVAILABLE = True
 except Exception:
     try:
-        from moviepy.editor import ColorClip, VideoFileClip, concatenate_videoclips
+        from moviepy.editor import AudioFileClip, ColorClip, CompositeAudioClip, VideoFileClip, concatenate_videoclips
         MOVIEPY_AVAILABLE = True
     except Exception:
         MOVIEPY_AVAILABLE = False
@@ -52,6 +54,8 @@ client = genai.Client(api_key=GEMINI_API_KEY) if GEMINI_API_KEY else None
 
 VOICE_MAP = {
     "Bengali": "bn-BD-NabanitaNeural",
+    "Bengali Female": "bn-BD-NabanitaNeural",
+    "Bengali Male": "bn-BD-PradeepNeural",
     "English": "en-US-AriaNeural",
     "Hindi": "hi-IN-SwaraNeural",
 }
@@ -66,6 +70,8 @@ CUSTOM_ASSET_VAULT = {
 STATE_LOCK = threading.Lock()
 LIVE_MONITOR = {
     "sync_state": "IDLE",  # IDLE বা PROCESSING
+    "current_stage": "IDLE",
+    "stage_label_bn": "প্রস্তুত (IDLE)",
     "active_task": None,
     "last_sync_at": None,
     "total_requests": 0,
@@ -100,13 +106,22 @@ def push_live_event(source: str, target: str, status: str, detail: str, is_fallb
         LIVE_MONITOR["recent_events"] = LIVE_MONITOR["recent_events"][:25]
 
 
-def set_sync_state(state: str, task_name: str | None = None):
+def set_live_stage(stage_code: str, stage_label_bn: str, task_name: str | None = None, count_request: bool = False):
     with STATE_LOCK:
-        LIVE_MONITOR["sync_state"] = state
+        LIVE_MONITOR["current_stage"] = stage_code
+        LIVE_MONITOR["stage_label_bn"] = stage_label_bn
+        LIVE_MONITOR["sync_state"] = "IDLE" if stage_code == "IDLE" else "PROCESSING"
         LIVE_MONITOR["active_task"] = task_name
         LIVE_MONITOR["last_sync_at"] = _now_iso()
-        if state == "PROCESSING":
+        if count_request:
             LIVE_MONITOR["total_requests"] += 1
+
+
+def set_sync_state(state: str, task_name: str | None = None):
+    if state == "PROCESSING":
+        set_live_stage("PROCESSING", f"কাজ চলছে: {task_name or 'প্রসেসিং'}", task_name, count_request=True)
+    else:
+        set_live_stage("IDLE", "প্রস্তুত (IDLE)", None, count_request=False)
 
 
 def _get_fernet():
@@ -253,7 +268,7 @@ class MasterBrainNeuralEngine:
                 "model": GEMINI_MODEL,
                 "connects_to": ["Pixabay_API", "NASA_API", "VaultCache"],
                 "capability": "স্ক্রিপ্ট, সিন প্ল্যান ও সার্চ কিওয়ার্ড তৈরি",
-                "fallback": "অস্থায়ী 503 আসলে অটো-রিট্রাই",
+                "fallback": "429 কোটা হলে অপেক্ষার বার্তা ও অস্থায়ী ত্রুটিতে রিট্রাই",
             },
             {
                 "id": "pixabay",
@@ -281,18 +296,18 @@ class MasterBrainNeuralEngine:
             },
             {
                 "id": "tts",
-                "name": "Edge-TTS Voice Engine",
+                "name": "Edge-TTS & Voice Refiner",
                 "online": EDGE_TTS_AVAILABLE,
-                "connects_to": ["OutputsFolder"],
-                "capability": "বাংলা/ইংরেজি/হিন্দি ভয়েস অডিও তৈরি (rate/pitch নিয়ন্ত্রণ)",
-                "fallback": "ভাষা/টেক্সট যাচাই ও নিরাপদ এরর বার্তা",
+                "connects_to": ["FFmpegRefiner", "OutputsFolder"],
+                "capability": "টেক্সট ছাঁটাই, ভয়েস তৈরি ও কণ্ঠ স্পষ্ট/সমান করা",
+                "fallback": "ffmpeg না থাকলে নিরাপদ অডিও আউটপুট ও ত্রুটি বার্তা",
             },
             {
                 "id": "moviepy",
                 "name": "MoviePy Clip Sequencer",
                 "online": MOVIEPY_AVAILABLE,
                 "connects_to": ["OutputsFolder"],
-                "capability": "১–১৫ সেকেন্ডের ছোট ক্লিপ ধাপে ধাপে তৈরি ও যুক্ত করা",
+                "capability": "১–১৫ সেকেন্ডের ছোট ক্লিপ ধাপে ধাপে তৈরি, মার্জ ও হালকা মিউজিক ব্লেন্ড",
                 "fallback": "সর্বোচ্চ ১৫s সীমা ও ডাউনলোডের পর ফাইল মুছে ফেলা",
             },
             {
@@ -320,6 +335,37 @@ class MasterBrainNeuralEngine:
 neural_brain = MasterBrainNeuralEngine()
 
 
+def _clean_tts_text(text: str) -> str:
+    return " ".join((text or "").split()).strip()
+
+
+def _refine_audio_with_ffmpeg(raw_path: str, final_path: str) -> bool:
+    ffmpeg_bin = shutil.which("ffmpeg")
+    if not ffmpeg_bin:
+        return False
+    audio_filter = "highpass=f=80,loudnorm=I=-16:TP=-1.5:LRA=11"
+    cmd = [
+        ffmpeg_bin,
+        "-y",
+        "-i",
+        raw_path,
+        "-af",
+        audio_filter,
+        "-ar",
+        "44100",
+        "-ac",
+        "1",
+        "-b:a",
+        "128k",
+        final_path,
+    ]
+    try:
+        proc = subprocess.run(cmd, capture_output=True, text=True, timeout=30)
+        return proc.returncode == 0 and os.path.exists(final_path) and os.path.getsize(final_path) > 0
+    except Exception:
+        return False
+
+
 async def _save_tts_audio(text: str, voice: str, out_path: str, rate: str = "-4%", pitch: str = "+1Hz") -> None:
     communicate = edge_tts.Communicate(text=text, voice=voice, rate=rate, pitch=pitch)
     await communicate.save(out_path)
@@ -329,66 +375,130 @@ def generate_free_tts(text: str, language: str = "Bengali", rate: str = "-4%", p
     if not EDGE_TTS_AVAILABLE:
         push_live_event("EdgeTTS", "Client", "ERROR", "edge-tts ইনস্টল নেই")
         return {"ok": False, "error": "edge-tts ইনস্টল করা নেই।"}
-    if not text.strip():
+
+    cleaned_text = _clean_tts_text(text)
+    if not cleaned_text:
         return {"ok": False, "error": "ভয়েসের জন্য কোনো টেক্সট দেওয়া হয়নি।"}
 
     voice = VOICE_MAP.get(language, "bn-BD-NabanitaNeural")
-    filename = f"tts_{int(time.time())}.mp3"
-    filepath = os.path.join(OUTPUT_DIR, filename)
-    set_sync_state("PROCESSING", "Edge-TTS Audio")
+    ts = int(time.time())
+    raw_filename = f"tts_raw_{ts}.mp3"
+    final_filename = f"tts_clean_{ts}.mp3"
+    raw_path = os.path.join(OUTPUT_DIR, raw_filename)
+    final_path = os.path.join(OUTPUT_DIR, final_filename)
+
+    set_live_stage("TTS_SYNTHESIS", "ধাপ ১/২: টেক্সট ছাঁটাই ও ভয়েস তৈরি হচ্ছে...", f"Edge-TTS ({voice})", count_request=True)
     try:
         push_live_event("MasterBrain", "EdgeTTS", "SYNCING", f"ভয়েস তৈরি হচ্ছে ({voice})")
-        asyncio.run(_save_tts_audio(text.strip(), voice, filepath, rate=rate, pitch=pitch))
-        if not os.path.exists(filepath) or os.path.getsize(filepath) == 0:
+        asyncio.run(_save_tts_audio(cleaned_text, voice, raw_path, rate=rate, pitch=pitch))
+        if not os.path.exists(raw_path) or os.path.getsize(raw_path) == 0:
             push_live_event("EdgeTTS", "Client", "ERROR", "খালি অডিও রেসপন্স এসেছে")
             return {"ok": False, "error": "অডিও তৈরি হয়নি; ভাষা ও টেক্সট যাচাই করুন।"}
-        push_live_event("EdgeTTS", "OutputsFolder", "OK", f"অডিও প্রস্তুত: {filename}")
+
+        set_live_stage("TTS_REFINING", "ধাপ ২/২: কণ্ঠ স্পষ্ট ও সমান করা হচ্ছে...", "Audio Refiner", count_request=False)
+        refined_ok = _refine_audio_with_ffmpeg(raw_path, final_path)
+
+        if refined_ok:
+            if os.path.exists(raw_path):
+                try:
+                    os.remove(raw_path)
+                except Exception:
+                    pass
+            push_live_event("AudioRefiner", "OutputsFolder", "OK", f"পরিশোধিত অডিও প্রস্তুত: {final_filename}")
+            return {
+                "ok": True,
+                "voice": voice,
+                "rate": rate,
+                "pitch": pitch,
+                "refined": True,
+                "file": f"/{OUTPUT_DIR}/{final_filename}",
+                "download_url": f"/api/download/{final_filename}",
+            }
+
+        # ffmpeg না থাকলে কাঁচা ফাইলটিকেই মূল আউটপুট নামে সংরক্ষণ
+        fallback_filename = f"tts_{ts}.mp3"
+        fallback_path = os.path.join(OUTPUT_DIR, fallback_filename)
+        os.replace(raw_path, fallback_path)
+        push_live_event("AudioRefiner", "Fallback", "FALLBACK", f"ফিল্টার ছাড়াই অডিও প্রস্তুত: {fallback_filename}", is_fallback=True)
         return {
             "ok": True,
             "voice": voice,
             "rate": rate,
             "pitch": pitch,
-            "file": f"/{OUTPUT_DIR}/{filename}",
-            "download_url": f"/api/download/{filename}",
+            "refined": False,
+            "file": f"/{OUTPUT_DIR}/{fallback_filename}",
+            "download_url": f"/api/download/{fallback_filename}",
         }
     except Exception as exc:
+        if os.path.exists(raw_path):
+            try:
+                os.remove(raw_path)
+            except Exception:
+                pass
         push_live_event("EdgeTTS", "Client", "ERROR", str(exc))
         return {"ok": False, "error": f"TTS তৈরি করতে সমস্যা হয়েছে: {str(exc)}"}
     finally:
-        set_sync_state("IDLE", None)
+        set_live_stage("IDLE", "প্রস্তুত (IDLE)", None, count_request=False)
 
 
-def build_sequential_clips(clip_seconds: int = 5, clip_count: int = 3, label: str = "fast_clip") -> dict:
+def _render_clip_sequence(durations: list[int], label: str = "fast_clip", bg_music_path: str | None = None) -> dict:
     if not MOVIEPY_AVAILABLE:
         push_live_event("MoviePy", "Client", "ERROR", "MoviePy ব্যবহারযোগ্য নয়")
         return {"ok": False, "error": "MoviePy ব্যবহারযোগ্য নয়।"}
 
-    safe_seconds = max(1, min(int(clip_seconds), 15))
-    safe_count = max(1, min(int(clip_count), 6))
+    safe_steps = [max(1, min(int(d), 15)) for d in durations[:6]]
     created_files = []
     part_paths = []
-    palette = [(20, 30, 55), (45, 25, 65), (18, 52, 58), (60, 32, 38)]
+    palette = [(20, 30, 55), (45, 25, 65), (18, 52, 58), (60, 32, 38), (28, 48, 42), (52, 40, 24)]
 
-    set_sync_state("PROCESSING", f"MoviePy {safe_seconds}s x {safe_count}")
+    set_live_stage("CLIP_RENDERING", f"ক্লিপ তৈরি হচ্ছে ({safe_steps}s)...", f"MoviePy {label}", count_request=True)
     try:
-        for idx in range(safe_count):
+        for idx, sec in enumerate(safe_steps):
             color = palette[idx % len(palette)]
-            clip = ColorClip(size=(640, 360), color=color, duration=safe_seconds)
-            trimmed = clip.subclipped(0, safe_seconds) if hasattr(clip, "subclipped") else clip.subclip(0, safe_seconds)
-            fname = f"{label}_part_{idx + 1}_{int(time.time())}.mp4"
+            clip = ColorClip(size=(640, 360), color=color, duration=sec)
+            trimmed = clip.subclipped(0, sec) if hasattr(clip, "subclipped") else clip.subclip(0, sec)
+            fname = f"{label}_part_{idx + 1}_{sec}s_{int(time.time())}.mp4"
             fpath = os.path.join(OUTPUT_DIR, fname)
-            trimmed.write_videofile(fpath, fps=20, codec="libx264", audio=False, logger=None)
+            trimmed.write_videofile(fpath, fps=20, codec="libx264", preset="ultrafast", audio=False, logger=None)
             trimmed.close()
             clip.close()
             part_paths.append(fpath)
             created_files.append(f"/{OUTPUT_DIR}/{fname}")
-            push_live_event("MoviePy", "OutputsFolder", "OK", f"ক্লিপ {idx + 1} ({safe_seconds}s) তৈরি হয়েছে")
+            push_live_event("MoviePy", "OutputsFolder", "OK", f"ক্লিপ {idx + 1} ({sec}s) তৈরি হয়েছে")
 
+        set_live_stage("VIDEO_MERGING", "ক্লিপগুলো যুক্ত করে এডিটিং চলছে...", "Merge Clips", count_request=False)
         merged_name = f"{label}_merged_{int(time.time())}.mp4"
         merged_path = os.path.join(OUTPUT_DIR, merged_name)
         loaded = [VideoFileClip(p) for p in part_paths]
         final_clip = concatenate_videoclips(loaded)
-        final_clip.write_videofile(merged_path, fps=20, codec="libx264", audio=False, logger=None)
+
+        music_clip = None
+        if bg_music_path and os.path.exists(bg_music_path):
+            try:
+                raw_audio = AudioFileClip(bg_music_path)
+                target_dur = final_clip.duration
+                if raw_audio.duration < target_dur and hasattr(raw_audio, "loop"):
+                    raw_audio = raw_audio.loop(duration=target_dur)
+                music_clip = raw_audio.subclipped(0, target_dur) if hasattr(raw_audio, "subclipped") else raw_audio.subclip(0, target_dur)
+                if hasattr(music_clip, "with_volume_scaled"):
+                    music_clip = music_clip.with_volume_scaled(0.15)
+                elif hasattr(music_clip, "volumex"):
+                    music_clip = music_clip.volumex(0.15)
+                audio_mix = CompositeAudioClip([music_clip])
+                final_clip = final_clip.with_audio(audio_mix) if hasattr(final_clip, "with_audio") else final_clip.set_audio(audio_mix)
+            except Exception:
+                pass
+
+        final_clip.write_videofile(
+            merged_path,
+            fps=20,
+            codec="libx264",
+            preset="ultrafast",
+            audio=bool(music_clip),
+            logger=None,
+        )
+        if music_clip:
+            music_clip.close()
         final_clip.close()
         for c in loaded:
             c.close()
@@ -397,7 +507,8 @@ def build_sequential_clips(clip_seconds: int = 5, clip_count: int = 3, label: st
         return {
             "ok": True,
             "mode": label,
-            "clip_seconds": safe_seconds,
+            "clip_seconds": safe_steps[0] if len(safe_steps) == 1 else safe_steps,
+            "steps_seconds": safe_steps,
             "created_count": len(created_files),
             "files": created_files,
             "merged_file": f"/{OUTPUT_DIR}/{merged_name}",
@@ -407,7 +518,13 @@ def build_sequential_clips(clip_seconds: int = 5, clip_count: int = 3, label: st
         push_live_event("MoviePy", "Client", "ERROR", str(exc))
         return {"ok": False, "error": f"ক্লিপ তৈরিতে সমস্যা হয়েছে: {str(exc)}"}
     finally:
-        set_sync_state("IDLE", None)
+        set_live_stage("IDLE", "প্রস্তুত (IDLE)", None, count_request=False)
+
+
+def build_sequential_clips(clip_seconds: int = 5, clip_count: int = 3, label: str = "fast_clip") -> dict:
+    safe_seconds = max(1, min(int(clip_seconds), 15))
+    safe_count = max(1, min(int(clip_count), 6))
+    return _render_clip_sequence([safe_seconds] * safe_count, label=label)
 
 
 @app.route("/")
@@ -425,6 +542,8 @@ def health_check():
     return jsonify({
         "status": "ONLINE",
         "model": GEMINI_MODEL,
+        "current_stage": LIVE_MONITOR["current_stage"],
+        "stage_label_bn": LIVE_MONITOR["stage_label_bn"],
         "gemini_configured": bool(GEMINI_API_KEY),
         "youtube_key_configured": bool(YOUTUBE_API_KEY),
         "pixverse_configured": bool(PIXVERSE_API_KEY),
@@ -486,7 +605,7 @@ Return ONLY valid JSON:
   ]
 }}
 """
-    set_sync_state("PROCESSING", f"Plan: {topic[:30]}")
+    set_live_stage("PLAN_GENERATING", "আইডিয়া ও সিন প্ল্যান তৈরি হচ্ছে...", f"Plan: {topic[:30]}", count_request=True)
     last_err = None
     try:
         for attempt in range(2):
@@ -516,14 +635,20 @@ Return ONLY valid JSON:
                     },
                 })
             except Exception as exc:
-                last_err = str(exc)
+                err_str = str(exc)
+                last_err = err_str
+                if "429" in err_str or "RESOURCE_EXHAUSTED" in err_str:
+                    push_live_event("Gemini", "Client", "ERROR", "মিনিটের কোটা (RPM) শেষ; প্রায় ৪৫-৫০ সেকেন্ড অপেক্ষা করুন")
+                    return jsonify({
+                        "error": "Gemini Free Tier-এর প্রতি মিনিটের রিকোয়েস্ট সীমা শেষ হয়েছে। অনুগ্রহ করে প্রায় ৪৫–৫০ সেকেন্ড অপেক্ষা করে আবার চেষ্টা করুন।"
+                    }), 429
                 push_live_event("Gemini", "RetryLoop", "FALLBACK", f"চেষ্টা {attempt + 1} ব্যর্থ: {last_err}", is_fallback=True)
                 time.sleep(1.5 * (attempt + 1))
 
         push_live_event("Gemini", "Client", "ERROR", last_err or "প্ল্যান তৈরি ব্যর্থ")
         return jsonify({"error": f"প্ল্যান তৈরি করতে সমস্যা হয়েছে: {last_err}"}), 503
     finally:
-        set_sync_state("IDLE", None)
+        set_live_stage("IDLE", "প্রস্তুত (IDLE)", None, count_request=False)
 
 
 @app.route("/api/tts", methods=["POST"])
@@ -544,6 +669,18 @@ def api_build_clips():
     clip_count = data.get("clip_count", 3)
     label = data.get("label", "fast_clip")
     result = build_sequential_clips(clip_seconds=clip_seconds, clip_count=clip_count, label=label)
+    return jsonify(result), (200 if result.get("ok") else 400)
+
+
+@app.route("/api/build-steps", methods=["POST"])
+def api_build_steps():
+    data = request.get_json(silent=True) or {}
+    durations = data.get("durations") or [1, 2, 3, 4, 5]
+    if not isinstance(durations, list) or not durations:
+        durations = [1, 2, 3, 4, 5]
+    label = data.get("label") or "step_clip"
+    bg_music_path = data.get("bg_music_path")
+    result = _render_clip_sequence(durations=durations, label=label, bg_music_path=bg_music_path)
     return jsonify(result), (200 if result.get("ok") else 400)
 
 
