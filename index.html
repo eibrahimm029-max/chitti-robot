@@ -32,14 +32,22 @@
     }
     h1 { margin: 0; font-size: 1.35rem; }
     .sub { color: var(--muted); font-size: 0.88rem; }
+    .header-right { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
     .badge {
       display: inline-flex; align-items: center; gap: 8px;
       padding: 7px 14px; border-radius: 999px; background: var(--panel); border: 1px solid var(--border);
       font-size: 0.85rem;
     }
+    .stage-pill {
+      display: inline-flex; align-items: center; gap: 8px;
+      padding: 6px 12px; border-radius: 999px;
+      background: var(--panel-2); border: 1px solid var(--border);
+      font-size: 0.82rem; color: var(--accent);
+    }
     .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--muted); }
     .dot.ok { background: var(--success); }
     .dot.err { background: var(--danger); }
+    .dot.busy { background: var(--accent); }
     .card {
       background: var(--panel); border: 1px solid var(--border);
       border-radius: 14px; padding: 18px; margin-bottom: 18px;
@@ -55,6 +63,7 @@
       cursor: pointer; border: none; border-radius: 10px; padding: 10px 16px;
       font-weight: 600; color: #fff; background: linear-gradient(135deg, var(--accent), var(--accent-2));
     }
+    button:disabled { opacity: 0.65; cursor: not-allowed; }
     button.secondary { background: var(--panel-2); border: 1px solid var(--border); color: var(--text); }
     pre {
       background: var(--panel-2); padding: 12px; border-radius: 10px;
@@ -63,6 +72,14 @@
     .scene { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 12px; margin-top: 10px; }
     .err { color: #fecaca; background: rgba(239,68,68,0.15); border: 1px solid rgba(239,68,68,0.4); padding: 12px; border-radius: 10px; display: none; margin-bottom: 14px; }
     #result { display: none; }
+    #monitor-panel { display: none; margin-bottom: 18px; }
+    .mod-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 10px; margin-top: 10px; }
+    .mod-item { background: var(--panel-2); border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; font-size: 0.84rem; }
+    .mod-head { display: flex; justify-content: space-between; align-items: center; font-weight: 600; margin-bottom: 4px; }
+    .tag-on { color: var(--success); font-size: 0.78rem; }
+    .tag-off { color: var(--muted); font-size: 0.78rem; }
+    .ev-list { margin-top: 10px; max-height: 210px; overflow-y: auto; }
+    .ev-row { background: var(--panel-2); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; margin-top: 6px; font-size: 0.82rem; }
   </style>
 </head>
 <body>
@@ -70,12 +87,28 @@
     <header>
       <div>
         <h1>AI Video Production Studio</h1>
-        <div class="sub">Gemini Script · Pexels &amp; PixVerse Ready · Free Natural TTS · MoviePy</div>
+        <div class="sub">Gemini Script · Pixabay &amp; NASA Ready · Refined TTS · MoviePy (1s–15s)</div>
       </div>
-      <div class="badge"><span class="dot" id="dot"></span><span id="status">চেক হচ্ছে...</span></div>
+      <div class="header-right">
+        <div class="stage-pill"><span class="dot" id="stage-dot"></span><span id="live-stage-badge">প্রস্তুত (IDLE)</span></div>
+        <div class="badge"><span class="dot" id="dot"></span><span id="status">চেক হচ্ছে...</span></div>
+        <button type="button" class="secondary" id="monitor-toggle-btn">Live Brain Monitor</button>
+      </div>
     </header>
 
     <div class="err" id="err"></div>
+
+    <div class="card" id="monitor-panel">
+      <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px;">
+        <strong>Real-Time Brain &amp; Module Flow</strong>
+        <span class="sub" id="monitor-sync-meta">সিঙ্ক হচ্ছে...</span>
+      </div>
+      <div class="mod-grid" id="monitor-modules"></div>
+      <div style="margin-top:12px;">
+        <label>Recent Live Signals &amp; Fallbacks</label>
+        <div class="ev-list" id="monitor-events"></div>
+      </div>
+    </div>
 
     <form class="card" id="form">
       <div class="grid">
@@ -93,9 +126,10 @@
           <input id="topic" type="text" placeholder="যেমন: এআই কীভাবে কাজ করে?" required />
         </div>
         <div>
-          <label for="language">Language</label>
+          <label for="language">Language &amp; Voice</label>
           <select id="language">
-            <option value="Bengali" selected>Bengali (বাংলা)</option>
+            <option value="Bengali" selected>Bengali (বাংলা · মেয়ে)</option>
+            <option value="Bengali Male">Bengali Male (বাংলা · ছেলে)</option>
             <option value="English">English</option>
             <option value="Hindi">Hindi</option>
           </select>
@@ -129,6 +163,7 @@
         <button type="submit" id="gen-btn">Generate Script &amp; Plan</button>
         <button type="button" class="secondary" id="tts-btn">Generate Free Voice (TTS)</button>
         <button type="button" class="secondary" id="clip-btn">Test MoviePy Clip</button>
+        <button type="button" class="secondary" id="step-clip-btn">1s–5s Fast Step Clips</button>
       </div>
     </form>
 
@@ -157,7 +192,7 @@
         <div id="scenes"></div>
       </div>
       <div class="card">
-        <label>Pexels &amp; PixVerse Status</label>
+        <label>Media Sources &amp; Vault Status</label>
         <pre id="api-info"></pre>
       </div>
     </div>
@@ -165,6 +200,8 @@
 
   <script>
     let currentPlan = null;
+    let monitorInterval = null;
+    let monitorOpen = false;
 
     function showErr(msg) {
       const el = document.getElementById("err");
@@ -177,13 +214,101 @@
       el.style.display = "none";
     }
 
+    function setStageUi(labelBn, isBusy = false) {
+      const badge = document.getElementById("live-stage-badge");
+      const sDot = document.getElementById("stage-dot");
+      if (badge) badge.textContent = labelBn || "প্রস্তুত (IDLE)";
+      if (sDot) sDot.className = isBusy ? "dot busy" : "dot ok";
+    }
+
+    async function parseJsonSafe(res) {
+      const rawText = await res.text();
+      const ct = (res.headers.get("content-type") || "").toLowerCase();
+      if (!ct.includes("application/json") && rawText.trim().startsWith("<")) {
+        throw new Error("সার্ভার থেকে JSON-এর বদলে HTML পেজ এসেছে (সম্ভবত সার্ভার রিস্টার্ট বা টাইমআউট হয়েছে)।");
+      }
+      try {
+        return JSON.parse(rawText);
+      } catch {
+        throw new Error("সার্ভারের রেসপন্স পড়া যায়নি; অনুগ্রহ করে আবার চেষ্টা করুন।");
+      }
+    }
+
+    async function fetchBrainMonitor() {
+      try {
+        const res = await fetch("/api/brain-monitor", { cache: "no-store" });
+        const data = await parseJsonSafe(res);
+        const tel = data.telemetry || {};
+        const isBusy = tel.sync_state === "PROCESSING";
+        setStageUi(tel.stage_label_bn || (isBusy ? "কাজ চলছে..." : "প্রস্তুত (IDLE)"), isBusy);
+
+        if (monitorOpen) {
+          const metaEl = document.getElementById("monitor-sync-meta");
+          if (metaEl) {
+            metaEl.textContent = `State: ${tel.sync_state || "IDLE"} · Requests: ${tel.total_requests || 0} · Fallbacks: ${tel.fallback_events || 0}`;
+          }
+          const modWrap = document.getElementById("monitor-modules");
+          if (modWrap && Array.isArray(data.modules)) {
+            modWrap.innerHTML = data.modules.map((m) => `
+              <div class="mod-item">
+                <div class="mod-head">
+                  <span>${m.name}</span>
+                  <span class="${m.online ? "tag-on" : "tag-off"}">${m.online ? "ONLINE" : "STANDBY"}</span>
+                </div>
+                <div class="sub">${m.capability || ""}</div>
+                <div class="sub" style="margin-top:4px;">→ ${(m.connects_to || []).join(", ")}</div>
+              </div>
+            `).join("");
+          }
+          const evWrap = document.getElementById("monitor-events");
+          if (evWrap && Array.isArray(tel.recent_events)) {
+            evWrap.innerHTML = tel.recent_events.slice(0, 8).map((ev) => `
+              <div class="ev-row">
+                <strong>[${ev.status}] ${ev.from} → ${ev.to}:</strong> ${ev.detail}
+              </div>
+            `).join("") || `<div class="sub">এখনো কোনো সাম্প্রতিক সিগন্যাল নেই।</div>`;
+          }
+        }
+        return data;
+      } catch {
+        return null;
+      }
+    }
+
+    function startStagePolling(ms = 1800) {
+      if (monitorInterval) clearInterval(monitorInterval);
+      fetchBrainMonitor();
+      monitorInterval = setInterval(fetchBrainMonitor, ms);
+    }
+
+    function stopStagePolling() {
+      if (monitorInterval && !monitorOpen) {
+        clearInterval(monitorInterval);
+        monitorInterval = null;
+      }
+    }
+
+    document.getElementById("monitor-toggle-btn").addEventListener("click", async () => {
+      monitorOpen = !monitorOpen;
+      const panel = document.getElementById("monitor-panel");
+      panel.style.display = monitorOpen ? "block" : "none";
+      if (monitorOpen) {
+        startStagePolling(2500);
+      } else {
+        stopStagePolling();
+      }
+    });
+
     async function checkHealth() {
       try {
-        const res = await fetch("/api/health");
-        const data = await res.json();
+        const res = await fetch("/api/health", { cache: "no-store" });
+        const data = await parseJsonSafe(res);
         document.getElementById("dot").className = "dot ok";
         document.getElementById("status").textContent =
           `Online · Gemini: ${data.gemini_configured ? "OK" : "No Key"} · TTS: ${data.edge_tts_available ? "OK" : "Off"} · MoviePy: ${data.moviepy_available ? "OK" : "Off"}`;
+        if (data.stage_label_bn) {
+          setStageUi(data.stage_label_bn, data.current_stage && data.current_stage !== "IDLE");
+        }
       } catch {
         document.getElementById("dot").className = "dot err";
         document.getElementById("status").textContent = "Backend Offline";
@@ -196,6 +321,8 @@
       const btn = document.getElementById("gen-btn");
       btn.disabled = true;
       btn.textContent = "তৈরি হচ্ছে...";
+      setStageUi("আইডিয়া ও সিন প্ল্যান তৈরি হচ্ছে...", true);
+      startStagePolling(1800);
       try {
         const res = await fetch("/api/generate-plan", {
           method: "POST",
@@ -209,14 +336,18 @@
             visual_style: document.getElementById("visual_style").value,
           }),
         });
-        const data = await res.json();
+        const data = await parseJsonSafe(res);
         if (!res.ok || !data.plan) throw new Error(data.error || "ত্রুটি হয়েছে");
         currentPlan = data.plan;
         document.getElementById("title").textContent = data.plan.title || "";
         document.getElementById("hook").textContent = "Hook: " + (data.plan.hook || "");
         document.getElementById("script").textContent = data.plan.voiceover_script || "";
         document.getElementById("thumb").textContent = data.plan.thumbnail_prompt || "";
-        document.getElementById("api-info").textContent = JSON.stringify({ pexels: data.pexels, pixverse: data.pixverse }, null, 2);
+        document.getElementById("api-info").textContent = JSON.stringify(
+          data.media_sources || { pexels: data.pexels, pixverse: data.pixverse },
+          null,
+          2
+        );
 
         const scWrap = document.getElementById("scenes");
         scWrap.innerHTML = "";
@@ -235,38 +366,90 @@
       } finally {
         btn.disabled = false;
         btn.textContent = "Generate Script & Plan";
+        await fetchBrainMonitor();
+        stopStagePolling();
       }
     });
 
     document.getElementById("tts-btn").addEventListener("click", async () => {
       clearErr();
+      const btn = document.getElementById("tts-btn");
       const text = document.getElementById("script").textContent || document.getElementById("topic").value;
       const lang = document.getElementById("language").value;
+      btn.disabled = true;
+      setStageUi("ভয়েস তৈরি ও পরিশোধন হচ্ছে...", true);
+      startStagePolling(1500);
       try {
         const res = await fetch("/api/tts", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ text, language: lang }),
         });
-        const data = await res.json();
+        const data = await parseJsonSafe(res);
         if (!res.ok || !data.ok) throw new Error(data.error || "TTS ব্যর্থ হয়েছে");
         document.getElementById("media-card").style.display = "block";
         document.getElementById("media-out").innerHTML = `<audio controls src="${data.file}"></audio>`;
       } catch (err) {
         showErr(err.message);
+      } finally {
+        btn.disabled = false;
+        await fetchBrainMonitor();
+        stopStagePolling();
       }
     });
 
     document.getElementById("clip-btn").addEventListener("click", async () => {
       clearErr();
+      const btn = document.getElementById("clip-btn");
+      btn.disabled = true;
+      setStageUi("MoviePy ক্লিপ তৈরি হচ্ছে...", true);
+      startStagePolling(1500);
       try {
-        const res = await fetch("/api/moviepy-sample", { method: "POST" });
-        const data = await res.json();
+        let res = await fetch("/api/build-clips", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ clip_seconds: 5, clip_count: 2, label: "sample_clip" }),
+        });
+        if (res.status === 404) {
+          res = await fetch("/api/moviepy-sample", { method: "POST" });
+        }
+        const data = await parseJsonSafe(res);
         if (!res.ok || !data.ok) throw new Error(data.error || "ক্লিপ তৈরি হয়নি");
+        const videoSrc = data.merged_file || data.file;
         document.getElementById("media-card").style.display = "block";
-        document.getElementById("media-out").innerHTML = `<video controls width="360" src="${data.file}"></video>`;
+        document.getElementById("media-out").innerHTML = `<video controls width="360" src="${videoSrc}"></video>`;
       } catch (err) {
         showErr(err.message);
+      } finally {
+        btn.disabled = false;
+        await fetchBrainMonitor();
+        stopStagePolling();
+      }
+    });
+
+    document.getElementById("step-clip-btn").addEventListener("click", async () => {
+      clearErr();
+      const btn = document.getElementById("step-clip-btn");
+      btn.disabled = true;
+      setStageUi("১s–৫s ধাপে ক্লিপ তৈরি হচ্ছে...", true);
+      startStagePolling(1500);
+      try {
+        const res = await fetch("/api/build-steps", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ durations: [1, 2, 3, 4, 5], label: "step_clip" }),
+        });
+        const data = await parseJsonSafe(res);
+        if (!res.ok || !data.ok) throw new Error(data.error || "স্টেপ ক্লিপ তৈরি হয়নি");
+        const videoSrc = data.merged_file || (data.clips && data.clips[0] && data.clips[0].file);
+        document.getElementById("media-card").style.display = "block";
+        document.getElementById("media-out").innerHTML = `<video controls width="360" src="${videoSrc}"></video>`;
+      } catch (err) {
+        showErr(err.message);
+      } finally {
+        btn.disabled = false;
+        await fetchBrainMonitor();
+        stopStagePolling();
       }
     });
 
